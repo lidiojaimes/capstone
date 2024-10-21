@@ -9,19 +9,25 @@ library(tidyverse)
 ```
 
 ```{r Reading in Data}
-stroke <- 
+stroke_raw <- 
   readxl::read_xlsx("Capstone Combined Data Collection Sheets - Summer 2024.xlsx", 
                     skip = 1) |> 
   janitor::clean_names()
-stroke <- stroke[-c(1,376), ] #get rid of dictionary and black row
+stroke <- stroke_raw[-c(1,376), ] #get rid of dictionary and black row
 
 # E336 (patient 333) and E340 (patient 337) have full date instead of just year
 stroke[stroke$id_number == 333, "year_of_birth"] = 1905 #set as 1981 instead of 1905
 stroke[stroke$id_number == 337, "year_of_birth"] = 1942
 stroke$date_identified = openxlsx::convertToDate(stroke$date_identified)
+
+#Patients 391 (repeat MRN), 528, 529, 536, 537, 555, 558, 576,582
+stroke <- 
+  stroke |> 
+  filter(!id_number%in%c(391, 528, 529, 536, 537, 555, 558, 576, 582))
 ```
+
 Not sure about error message regarding *Expiration Date* may be because of duplicate rownames. There are two duplicate columns for expiration date 97 and 173
 
 ```{r}
-stroke
+stroke 
 ```
