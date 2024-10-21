@@ -1,0 +1,27 @@
+---
+title: "Data Exploration"
+author: "Lidio Jaimes Jr"
+date: "2024-10-21"
+output: pdf_document
+---
+```{r Importing libraries}
+library(tidyverse)
+```
+
+```{r Reading in Data}
+stroke <- 
+  readxl::read_xlsx("Capstone Combined Data Collection Sheets - Summer 2024.xlsx", 
+                    skip = 1) |> 
+  janitor::clean_names()
+stroke <- stroke[-c(1,376), ] #get rid of dictionary and black row
+
+# E336 (patient 333) and E340 (patient 337) have full date instead of just year
+stroke[stroke$id_number == 333, "year_of_birth"] = 1905 #set as 1981 instead of 1905
+stroke[stroke$id_number == 337, "year_of_birth"] = 1942
+stroke$date_identified = openxlsx::convertToDate(stroke$date_identified)
+```
+Not sure about error message regarding *Expiration Date* may be because of duplicate rownames. There are two duplicate columns for expiration date 97 and 173
+
+```{r}
+stroke
+```
