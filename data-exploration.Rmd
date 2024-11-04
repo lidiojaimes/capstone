@@ -20,14 +20,19 @@ stroke[stroke$id_number == 333, "year_of_birth"] = 1905 #set as 1981 instead of 
 stroke[stroke$id_number == 337, "year_of_birth"] = 1942
 stroke$date_identified = openxlsx::convertToDate(stroke$date_identified)
 
-#Patients 391 (repeat MRN), 528, 529, 536, 537, 555, 558, 576,582
+#Patients 211, 391 (repeat MRN), 528, 529, 536, 537, 555, 558, 576, 582
 stroke <- 
   stroke |> 
-  filter(!id_number%in%c(391, 528, 529, 536, 537, 555, 558, 576, 582))
+  filter(!id_number%in%c(211, 391, 528, 529, 536, 537, 555, 558, 576, 582),
+         ischemic == 1) #focus on ischemic
 ```
 
 Not sure about error message regarding *Expiration Date* may be because of duplicate rownames. There are two duplicate columns for expiration date 97 and 173
 
 ```{r}
-stroke 
+stroke$date_of_stroke
+stroke |> 
+  filter(is.na(ischemic))
+table(stroke$prior_stroke,useNA = "ifany")
 ```
+
