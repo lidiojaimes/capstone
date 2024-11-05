@@ -19,6 +19,7 @@ stroke <- stroke_raw[-c(1,376), ] #get rid of dictionary and black row
 stroke[stroke$id_number == 333, "year_of_birth"] = 1905 #set as 1981 instead of 1905
 stroke[stroke$id_number == 337, "year_of_birth"] = 1942
 stroke$date_identified = openxlsx::convertToDate(stroke$date_identified)
+stroke$date_of_stroke = openxlsx::convertToDate(stroke$date_of_stroke)
 
 #Patients 211, 391 (repeat MRN), 528, 529, 536, 537, 555, 558, 576, 582
 stroke <- 
@@ -30,9 +31,8 @@ stroke <-
 Not sure about error message regarding *Expiration Date* may be because of duplicate rownames. There are two duplicate columns for expiration date 97 and 173
 
 ```{r}
-stroke$date_of_stroke
 stroke |> 
-  filter(is.na(ischemic))
-table(stroke$prior_stroke,useNA = "ifany")
+  select(id_number,location_of_stroke,cortical_location_if_applicable)
 ```
 
+They need to move row 3 for "Lesion Location" section to row 2. Location of stroke variable doesn't tell us anything in R, has a 1 if they had it in the brainstem, 0 otherwise. 
