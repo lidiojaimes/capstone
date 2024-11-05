@@ -35,4 +35,16 @@ stroke |>
   select(id_number,location_of_stroke,cortical_location_if_applicable)
 ```
 
-They need to move row 3 for "Lesion Location" section to row 2. Location of stroke variable doesn't tell us anything in R, has a 1 if they had it in the brainstem, 0 otherwise. 
+They need to move row 3 for "Lesion Location" section to row 2. Location of stroke variable doesn't tell us anything in R, has a 1 if they had it in the brainstem, 0 otherwise. Could use the case_when to make the factor variable
+
+```{r}
+# stroke |> 
+#   mutate(location_of_stroke = case_when(
+#     brainstem == 1 ~ "brainstem",
+#     cerebellum == 1 ~ "cerebellum"
+#     cortical == 1 ~ "cortical",
+#     subcortical == 1 ~ "subcortical",
+#     other == 1 ~ "other"
+#   ))
+```
+
