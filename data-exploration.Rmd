@@ -6,12 +6,14 @@ output: pdf_document
 ---
 ```{r Importing libraries}
 library(tidyverse)
+library(table1)
 ```
 
 ```{r Reading in Data}
 stroke_raw <- 
   readxl::read_xlsx("Capstone Combined Data Collection Sheets - Summer 2024.xlsx", 
-                    skip = 1) |> 
+                    skip = 1,
+                    na=c("", " ", "UNK", "Unk", "NA", "na", "Na", 9999, "????")) |> 
   janitor::clean_names()
 stroke <- stroke_raw[-c(1,376), ] #get rid of dictionary and black row
 
@@ -26,25 +28,67 @@ stroke <-
   stroke |> 
   filter(!id_number%in%c(211, 391, 528, 529, 536, 537, 555, 558, 576, 582),
          ischemic == 1) #focus on ischemic
+#patient 100 has a good bit of missing
 ```
 
-Not sure about error message regarding *Expiration Date* may be because of duplicate rownames. There are two duplicate columns for expiration date 97 and 173
 
-```{r}
-stroke |> 
-  select(id_number,location_of_stroke,cortical_location_if_applicable)
+```{r Data Wrangling}
+stroke <-
+  stroke |>
+  mutate(location_of_stroke = 
+           case_when(
+             brainstem_stroke_lcation == 1 ~ "brainstem",
+             cerebellum_stroke_location == 1 ~ "cerebellum",
+             cortical_stroke_location == 1 ~ "cortical",
+             subcortical_stroke_location == 1 ~ "subcortical",
+             other_stroke_location == 1 ~ "other/unknown",
+             TRUE ~ "other/unknown"),
+         location_of_stroke = factor(location_of_stroke,
+                                     levels = c("brainstem","cerebellum",
+                                                "cortical","subcortical",
+                                                "other/unknown"),
+                                     labels = c("Brainstem","Cerebellum",
+                                                "Cortical","Subcortical",
+                                                "Unknown")),
+         race = ifelse(race=="Other","Other","White"),
+         race = case_when(
+           race == "White" ~ "White",
+           str_detect(patient_identification_notes, "African") ~ "Black",
+           TRUE ~ "Other"),
+         race = factor(race, levels = c("White", "Black", "Other")),
+         age = as.numeric(age),
+         admission_nihss = as.numeric(admission_nihss),
+         cholesterol_mg_d_l = as.numeric(cholesterol_mg_d_l),
+         prior_stroke = case_when(
+           prior_stroke == 0 ~ "No",
+           prior_stroke == 1 ~ "Yes"),
+         prior_tia = case_when(
+           prior_tia == 0 ~ "No",
+           prior_tia == 1 ~ "Yes"))
 ```
 
-They need to move row 3 for "Lesion Location" section to row 2. Location of stroke variable doesn't tell us anything in R, has a 1 if they had it in the brainstem, 0 otherwise. Could use the case_when to make the factor variable
+Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis?
 
 ```{r}
-# stroke |> 
-#   mutate(location_of_stroke = case_when(
-#     brainstem == 1 ~ "brainstem",
-#     cerebellum == 1 ~ "cerebellum"
-#     cortical == 1 ~ "cortical",
-#     subcortical == 1 ~ "subcortical",
-#     other == 1 ~ "other"
-#   ))
+table(stroke$prior_tia,useNA = "ifany")
+```
+
+
+```{r Patient Demographics}
+label(stroke$race) <- "Race"
+label(stroke$age) <- "Age"
+label(stroke$sex) <- "Sex"
+label(stroke$bmi_kg_m_2) <- "BMI"
+label(stroke$cholesterol_mg_d_l) <- "Cholesterol"
+label(stroke$admission_nihss) <- "Admission NIHSS"
+label(stroke$prior_stroke) <- "Prior Stroke"
+units(stroke$age) <- "years"
+units(stroke$bmi_kg_m_2) <- "kg/m^2"
+units(stroke$cholesterol_mg_d_l) <- "mg/dL"
+
+table1(~ race + age + sex + bmi_kg_m_2 + cholesterol_mg_d_l + 
+         prior_stroke + admission_nihss | location_of_stroke,
+       overall = c(left = "Overall"),
+       data = stroke)
 ```
 
