@@ -70,7 +70,8 @@ stroke <-
 Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis?
 
 ```{r}
-table(stroke$prior_tia,useNA = "ifany")
+table(stroke$covid_19,useNA = "ifany")
+stroke |> select(id_number,covid_19,covid_19_notes)
 ```
 
 
