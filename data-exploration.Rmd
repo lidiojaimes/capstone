@@ -9,6 +9,11 @@ library(tidyverse)
 library(table1)
 ```
 
+```{r}
+table(stroke_raw$demo)
+```
+
+
 ```{r Reading in Data}
 stroke_raw <- 
   readxl::read_xlsx("Capstone Combined Data Collection Sheets - Summer 2024.xlsx", 
@@ -71,10 +76,19 @@ stroke <-
 ```
 
 Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis?
+**Need to go in and make 532 into other and 223 as native hawaiian**
 
 ```{r}
-table(stroke$covid_19,useNA = "ifany")
+table(stroke$date_of_stroke,useNA = "ifany")
 stroke |> select(id_number,covid_19,covid_19_notes)
+
+class(stroke$date_of_stroke)
+
+stroke |> 
+  filter(date_of_stroke<"2020-03-15") |> 
+  select(id_number,date_of_stroke) |> 
+  arrange(date_of_stroke)
+155/438
 ```
 
 
@@ -94,5 +108,16 @@ table1(~ race + age + sex + bmi_kg_m_2 + cholesterol_mg_d_l +
          prior_stroke + admission_nihss | location_of_stroke,
        overall = c(left = "Overall"),
        data = stroke)
+```
+
+```{r}
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=location_of_stroke,fill=location_of_stroke)) + 
+  geom_boxplot() + 
+  theme_bw() +
+  theme(legend.position = "none") + 
+  ggtitle("Stroke Severity by Lesion Location") + 
+  xlab("Admission NIHSS") + 
+  ylab("Location of Stroke")
 ```
 
