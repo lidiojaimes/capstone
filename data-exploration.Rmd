@@ -6,13 +6,9 @@ output: pdf_document
 ---
 ```{r Importing libraries}
 library(tidyverse)
+library(forcats)
 library(table1)
 ```
-
-```{r}
-table(stroke_raw$demo)
-```
-
 
 ```{r Reading in Data}
 stroke_raw <- 
@@ -73,24 +69,35 @@ stroke <-
          prior_tia = case_when(
            prior_tia == 0 ~ "No",
            prior_tia == 1 ~ "Yes"))
+
+stroke[stroke$id_number==532,"race"] = "Other"
+stroke[stroke$id_number==223,"race"] = "Other"
 ```
 
-Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis?
-**Need to go in and make 532 into other and 223 as native hawaiian**
+Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis? 
+**Need to go in and make 532 into other and 223 as native hawaiian** 223 identified as white, but also Native Hawaiian?
+ 
 
+This is about COVID-19 variable: 
 ```{r}
 table(stroke$date_of_stroke,useNA = "ifany")
 stroke |> select(id_number,covid_19,covid_19_notes)
 
-class(stroke$date_of_stroke)
 
 stroke |> 
-  filter(date_of_stroke<"2020-03-15") |> 
-  select(id_number,date_of_stroke) |> 
-  arrange(date_of_stroke)
-155/438
+  filter(date_of_stroke>="2020-03-15") |> 
+  select(id_number,date_of_stroke,covid_19,covid_19_notes) |> 
+  group_by(covid_19) |> 
+  summarise(n())
+  # arrange(date_of_stroke) |> 
+  # filter(covid_19=="Yes (Once)")
+
+stroke |> 
+  mutate(date_cov19 = ifelse(date_of_stroke>="2020-03-15","after covid","before covid")) |> 
+  filter(is.na(date_cov19))
 ```
-c
+
+Patients 4, 48, 103, 139, 143, and 168 all have "Yes (Once)" for COVID-19 variable, even though they had a stroke prior to the COVID-19 date 2020-03-15. Patient 48 had their stroke on 2020-02-28, so probably COVID. 
 
 ```{r Patient Demographics}
 label(stroke$race) <- "Race"
@@ -112,8 +119,9 @@ table1(~ race + age + sex + bmi_kg_m_2 + cholesterol_mg_d_l +
 
 ```{r}
 stroke |> 
-  ggplot(aes(x=admission_nihss,y=location_of_stroke,fill=location_of_stroke)) + 
-  geom_boxplot() + 
+  ggplot(aes(x=admission_nihss,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
+  geom_violin(alpha=.5) + 
+  #geom_boxplot(width=.1,fill="grey",alpha=.2)+
   theme_bw() +
   theme(legend.position = "none") + 
   ggtitle("Stroke Severity by Lesion Location") + 
