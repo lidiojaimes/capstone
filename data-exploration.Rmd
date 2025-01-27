@@ -129,6 +129,17 @@ stroke |>
   ylab("Location of Stroke")
 ```
 
+Using cutoffs from JHU, hopkinsmedicine.org
+```{r Figure 3}
+stroke |> 
+  mutate(cholesterol_group = case_when(
+    cholesterol_mg_d_l < 200 ~ "Normal",
+    cholesterol_mg_d_l >= 200 & cholesterol_mg_d_l <=239 ~ "Borderline high",
+    cholesterol_mg_d_l >= 240 ~ "High",
+  ))
+```
+
+
 ```{r Figure 5}
 stroke |> 
   ggplot(aes(x=age,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
