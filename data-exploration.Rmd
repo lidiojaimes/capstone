@@ -129,3 +129,15 @@ stroke |>
   ylab("Location of Stroke")
 ```
 
+```{r}
+stroke |> 
+  ggplot(aes(x=age,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.3,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  ggtitle("Age Distribution by Stroke Location") + 
+  xlab("Age") + 
+  ylab("Location of Stroke")
+```
+
