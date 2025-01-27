@@ -117,7 +117,7 @@ table1(~ race + age + sex + bmi_kg_m_2 + cholesterol_mg_d_l +
        data = stroke)
 ```
 
-```{r}
+```{r Figure 2}
 stroke |> 
   ggplot(aes(x=admission_nihss,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
   geom_violin(alpha=.5) + 
@@ -129,7 +129,7 @@ stroke |>
   ylab("Location of Stroke")
 ```
 
-```{r}
+```{r Figure 5}
 stroke |> 
   ggplot(aes(x=age,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
   geom_violin(alpha=.5) + 
