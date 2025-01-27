@@ -90,7 +90,7 @@ stroke |>
   arrange(date_of_stroke)
 155/438
 ```
-
+c
 
 ```{r Patient Demographics}
 label(stroke$race) <- "Race"
