@@ -68,7 +68,20 @@ stroke <-
            prior_stroke == 1 ~ "Yes"),
          prior_tia = case_when(
            prior_tia == 0 ~ "No",
-           prior_tia == 1 ~ "Yes"))
+           prior_tia == 1 ~ "Yes"),
+         cholesterol_group = case_when(
+           cholesterol_mg_d_l < 200 ~ "Normal",
+           cholesterol_mg_d_l >= 200 & cholesterol_mg_d_l <=239 ~ "Borderline high",
+           cholesterol_mg_d_l >= 240 ~ "High"),
+         cholesterol_group = factor(cholesterol_group,
+                                    levels = c("Normal","Borderline high","High")),
+         cigarette_smoking = case_when(
+           cigarette_smoking == "Former" | cigarette_smoking == "former" ~ "Former",
+           cigarette_smoking == "Never" | cigarette_smoking == "NEver" ~ "Never",
+           cigarette_smoking == "Current" | cigarette_smoking == "Current\r\n\rCurrent" ~ "Current"),
+         cigarette_smoking = factor(cigarette_smoking,
+                                    levels = c("Never","Former","Current")),
+         ischemic_heart_disease = ifelse(ischemic_heart_disease == 0, "No", "Yes"))
 
 stroke[stroke$id_number==532,"race"] = "Other"
 stroke[stroke$id_number==223,"race"] = "Other"
@@ -85,19 +98,31 @@ stroke |> select(id_number,covid_19,covid_19_notes)
 
 
 stroke |> 
-  filter(date_of_stroke>="2020-03-15") |> 
+  filter(date_of_stroke<="2020-03-15") |> 
   select(id_number,date_of_stroke,covid_19,covid_19_notes) |> 
   group_by(covid_19) |> 
   summarise(n())
   # arrange(date_of_stroke) |> 
   # filter(covid_19=="Yes (Once)")
 
+
+stroke[stroke$id_number==48,"covid_19_notes"] = "2022-09-18"
+stroke[stroke$id_number==139,"covid_19_notes"] = "2021-09-19"
+stroke[stroke$id_number==143,"covid_19_notes"] = "2021-07-27"
+stroke[stroke$id_number==168,"covid_19_notes"] = "2022-01-31"
+
 stroke |> 
-  mutate(date_cov19 = ifelse(date_of_stroke>="2020-03-15","after covid","before covid")) |> 
-  filter(is.na(date_cov19))
+  mutate(date_cov19 = ifelse(date_of_stroke>="2020-03-15","after covid","before covid"),
+         ) |> 
+  filter(date_cov19 == "before covid",
+         covid_19 == "Yes (Once)") |> 
+  select(id_number,date_of_stroke,covid_19,covid_19_notes)
+
+
+
 ```
 
-Patients 4, 48, 103, 139, 143, and 168 all have "Yes (Once)" for COVID-19 variable, even though they had a stroke prior to the COVID-19 date 2020-03-15. Patient 48 had their stroke on 2020-02-28, so probably COVID. 
+Patients 4, 48, 103, 139, 143, and 168 all have "Yes (Once)" for COVID-19 variable, even though they had a stroke prior to the COVID-19 date 2020-03-15. 
 
 ```{r Patient Demographics}
 label(stroke$race) <- "Race"
@@ -121,10 +146,9 @@ table1(~ race + age + sex + bmi_kg_m_2 + cholesterol_mg_d_l +
 stroke |> 
   ggplot(aes(x=admission_nihss,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
   geom_violin(alpha=.5) + 
-  #geom_boxplot(width=.1,fill="grey",alpha=.2)+
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
   theme_bw() +
   theme(legend.position = "none") + 
-  ggtitle("Stroke Severity by Lesion Location") + 
   xlab("Admission NIHSS") + 
   ylab("Location of Stroke")
 ```
@@ -132,23 +156,71 @@ stroke |>
 Using cutoffs from JHU, hopkinsmedicine.org
 ```{r Figure 3}
 stroke |> 
-  mutate(cholesterol_group = case_when(
-    cholesterol_mg_d_l < 200 ~ "Normal",
-    cholesterol_mg_d_l >= 200 & cholesterol_mg_d_l <=239 ~ "Borderline high",
-    cholesterol_mg_d_l >= 240 ~ "High",
-  ))
+  ggplot(aes(x = admission_nihss, y = bmi_kg_m_2, color = cholesterol_group)) +
+  scale_color_manual(name = "Cholesterol Group",
+                     labels = c("Normal","Boderline High","High"),
+                     values = c("red","blue", "green")) + 
+  geom_point() + 
+  labs(x = "Admission NIHSS", y = "BMI") + 
+  theme_bw() +
+  geom_hline(yintercept=18.5, linetype="dashed", color = "black") +
+  geom_hline(yintercept=25, linetype="dashed", color = "black")
+
 ```
 
+```{r Figure 4}
+stroke |> 
+  group_by(location_of_stroke,diabetic_neuropathy) |> 
+  summarise(median_nihss=median(admission_nihss,na.rm=TRUE)) |> 
+  filter(!is.na(diabetic_neuropathy)) |> 
+  ggplot(aes(x = (location_of_stroke),
+             y = median_nihss,
+             fill = diabetic_neuropathy)) + 
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, color="black") +
+  scale_fill_manual(name = "Diabetic Neuropathy",
+                     labels = c("No","Yes"),
+                     values = c("red","blue")) + 
+  theme_bw() +
+  xlab("Location of Stroke") + 
+  ylab("Median Admission NIHSS Score")
+```
 
 ```{r Figure 5}
 stroke |> 
-  ggplot(aes(x=age,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
+  ggplot(aes(x=admission_nihss,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
   geom_violin(alpha=.5) + 
-  geom_boxplot(width=.3,fill="grey",alpha=.2)+
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
   theme_bw() +
   theme(legend.position = "none") + 
-  ggtitle("Age Distribution by Stroke Location") + 
-  xlab("Age") + 
+  xlab("Admission NIHSS") + 
   ylab("Location of Stroke")
 ```
 
+```{r Figure 6}
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=fct_rev(cigarette_smoking),fill=cigarette_smoking)) + 
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Admission NIHSS") + 
+  ylab("Smoking History")
+```
+
+```{r Figure 6}
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=fct_rev(ischemic_heart_disease),fill=ischemic_heart_disease)) + 
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Admission NIHSS") + 
+  ylab("Ischemic Heart Disease History")
+```
+
+For the discharge, make a case_when to include all different levels. starts at discharge (fq) to other discharge location (ga). Expiration is if they died before discharge. Check if they have a yes and a discharge location (quality conflict)
+
+
+diabetes mellitus (dm) is an indicator for diabetes
+
+last known well time (LKWT)
