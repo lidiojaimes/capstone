@@ -232,6 +232,7 @@ stroke |>
   ylab("COVID-19")
 ```
 
+Is the COVID variable whether they have any history or if it's present when they had stroke? maybe a mix of both? Patient 72 tested positive for COVID on 7/21/21 and their date of stroke is 11/5/20. The COVID-19 notes is that the patient expired on 7/27/21 secondary to COVID-19. The cutoff date for COVID is 3/15/20
 
 ```{r Figure 8: Heart disease vs NIHSS}
 stroke |> 
@@ -305,7 +306,7 @@ stroke |>
 
 
 
-```{r}
+```{r Discharge} 
 discharge_info <- 
   stroke |> 
   select(id_number,expiration,acute_rehabilitation,subacute_rehabilitation,
@@ -318,11 +319,36 @@ discharge_info |>
   mutate(sum_discharge=apply(discharge_info[3:9],1,sum)) |> 
   filter(sum_discharge==2)
 
-stroke |> 
-  mutate(discharge_info = case_when(
-    expiration == 1 ~ 
-  ))
+
+stroke[, c(172,174:177,179:182)] <- lapply(stroke[, c(172,174:177,179:182)], as.numeric)
+
+test<-
+  stroke |> 
+  mutate(multiple_discharge = 
+           ifelse(rowSums(stroke[,c(172,174:177,179:182)], na.rm = TRUE) > 1, 1, 0),
+         discharge_info = 
+           case_when(
+             multiple_discharge==0 & expiration == 1 ~ "Expiration",
+             multiple_discharge==0 & acute_rehabilitation == 1 ~ "Acute rehabilitation",
+             multiple_discharge==0 & subacute_rehabilitation == 1 ~ "Subacute rehabilitation",
+             multiple_discharge==0 & inpatient_rehabilitation == 1 ~ "Inpatient rehabilitation",
+             multiple_discharge==0 & assited_living_facility == 1 ~ "Assited living facility",
+             multiple_discharge==0 & home_health == 1 ~ "Home health",
+             multiple_discharge==0 & home_with_no_needs == 1 ~ "Home with no needs",
+             multiple_discharge==0 & hospice == 1 ~ "Hospice",
+             multiple_discharge==0 & other_discharge_location == 1 ~ "Other discharge location",
+             multiple_discharge==1 ~ "multiple discharge",
+             TRUE ~ "other/unknown"),
+         discharge_nihss=as.numeric(discharge_nihss))
+
+table1(~ admission_nihss+discharge_nihss|discharge_info,overall = c(left = "Overall"),data=test)
+
+table(stroke$expiration,useNA = "ifany")
 ```
+
+Everyone (9 patients) with a sum of two for discharge outcomes have home_health and hospice. Only one patient (119) has acute_rehabilitation and home_health.
+
+For the discharge, make a case_when to include all different levels. starts at discharge (fq) to other discharge location (ga). Expiration is if they died before discharge. Check if they have a yes and a discharge location (quality conflict)
 
 ```{r}
 table(is.na(stroke$pt_am_pac_score))
@@ -343,12 +369,34 @@ look at insulin as well, medication notes
 
 last known well time (LKWT)
 
+```{r Relationship between outcome variables}
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=discharge_nihss))+
+  geom_point()
+```
+
 
 ```{r}
+stroke
+```
+
+
+```{r inital model}
 mdl1<-lm(admission_nihss~location_of_stroke+prior_stroke+covid_19+race+sex+age+
            bmi_kg_m_2+cholesterol_mg_d_l+dm+depression+length_of_admission_days,
          data=stroke)
 summary(mdl1)
 plot(mdl1)
+```
+
+```{r}
+hist(stroke$admission_nihss)
+hist(as.numeric(stroke$discharge_mrs_score))
+
+table(stroke$discharge_mrs_score,useNA="ifany")
+
+stroke$ot_am_pac_score
+table(stroke$pt_am_pac_score,useNA="ifany")
+table(stroke$ot_am_pac_score,useNA="ifany")
 ```
 
