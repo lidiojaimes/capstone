@@ -1,0 +1,18 @@
+---
+title: "Methodology"
+author: "Lidio Jaimes Jr"
+date: "2025-02-21"
+output: pdf_document
+---
+$$E[\text{length of admission days}] = \beta_0 + \beta_1\text{AdmitNIHSS}_i + \beta_2\text{StrokeLocation}_i + \overrightarrow{\boldsymbol{\gamma}}^T\overrightarrow{\boldsymbol{z}_i}$$
+
+```{r}
+attach(stroke)
+lm(length_of_admission_days~admission_nihss+car)
+detach(stroke)
+```
+
+```{r}
+table(stroke$location_of_stroke)
+```
+
