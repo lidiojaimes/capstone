@@ -6,7 +6,6 @@ output: pdf_document
 ---
 $$E[\text{length of admission days}] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{StrokeLocation}_i + \beta_3\text{CaregiverPresence}_i + \\ \beta_4\text{Medication}_i + \beta_5\text{PriorStroke}_i + \beta_6\text{Race}_i + \beta_7\text{Age}_i + \beta_8\text{Sex}_i + \beta_9\text{BMI}_i + \beta_{10}\text{Cholesterol}_i + \epsilon_i$$
 
-
 $$E[\text{length of admission days}] = \beta_0 + \beta_1\text{AdmitNIHSS}_i + \beta_2\text{StrokeLocation}_i + \overrightarrow{\boldsymbol{\gamma}}^T\overrightarrow{\boldsymbol{z}_i}$$
 
 ```{r}
