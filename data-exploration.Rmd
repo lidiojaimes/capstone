@@ -25,16 +25,18 @@ stroke$date_identified = openxlsx::convertToDate(stroke$date_identified)
 stroke$date_of_stroke = openxlsx::convertToDate(stroke$date_of_stroke)
 stroke$expiration_date_in_hospital = openxlsx::convertToDate(stroke$expiration_date_in_hospital)
 stroke$expiration_date = openxlsx::convertToDate(stroke$expiration_date)
+stroke$length_of_admission_days = round(as.numeric(stroke$length_of_admission_days),0)
 
-
-
-#Patients 211, 391 (repeat MRN), 528, 529, 536, 537, 555, 558, 576, 582
 stroke <- 
   stroke |> 
   filter(!id_number%in%c(211, 391, 528, 529, 536, 537, 555, 558, 576, 582),
-         ischemic == 1) #focus on ischemic
-#patient 100 has a good bit of missing
+         !id_number%in%c(316,322),
+         ischemic == 1) 
 ```
+
+For notes: Patient 100 has a good bit of missing. Patient 469 was transferred to different hospital. Neither removed yet. Patient 532 has 43 days of admission, but not removed yet.
+
+For paper: Patients 316 (105 days) and 322 (79 days) were removed from analyses. Their length of admission days being so large is likely due to different factors. Patients 211, 528, 529, 536, 537, 555, 558, 576, 582 were all/majority blank and removed from analyses. Patient 391 had repeat MRN and one observation was removed from analyses. Focus on ischemic, so everyone with different type of stroke was removed. Patient 361 has a decimal for length of admission days, was rounded up to 16. 
 
 ```{r Data Wrangling}
 stroke$brainstem_stroke_lcation <- as.numeric(stroke$brainstem_stroke_lcation)
@@ -95,13 +97,20 @@ stroke <-
            covid_19 == "negative" ~ "No"),
          dm = factor(dm,levels=c(0,1),labels=c("No","Yes")),
          depression = factor(depression,levels=c(0,1),labels=c("No","Yes")),
-         length_of_admission_days = as.numeric(length_of_admission_days))
+         length_of_admission_days = as.numeric(length_of_admission_days),
+         caregiver = case_when(
+           presence_of_caregiver == "0" ~ "Absent",
+           presence_of_caregiver == "1" ~ "Present",
+           TRUE ~ "Unknown"),
+         caregiver = factor(caregiver))
 
 stroke[stroke$id_number==532,"race"] = "Other"
 stroke[stroke$id_number==223,"race"] = "Other"
 ```
 
-Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532 and 223). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis? 
+Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532 and 223). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis?
+
+Notes for paper: weird entry for presence of caregiver for 18, set as unknown.
 
 This is about COVID-19 variable: 
 ```{r COVID-19}
@@ -129,12 +138,16 @@ label(stroke$bmi_kg_m_2) <- "BMI"
 label(stroke$cholesterol_mg_d_l) <- "Cholesterol"
 label(stroke$admission_nihss) <- "Admission NIHSS"
 label(stroke$prior_stroke) <- "Prior Stroke"
+label(stroke$length_of_admission_days) <- "Length of Admission"
+label(stroke$covid_19) <- "COVID-19"
+
 units(stroke$age) <- "years"
 units(stroke$bmi_kg_m_2) <- "kg/m^2"
 units(stroke$cholesterol_mg_d_l) <- "mg/dL"
+units(stroke$length_of_admission_days) <- "days"
 
-table1(~ race + age + sex + bmi_kg_m_2 + cholesterol_mg_d_l + 
-         prior_stroke + admission_nihss | location_of_stroke,
+table1(~ race + age + sex + bmi_kg_m_2 + cholesterol_mg_d_l + covid_19 +
+         prior_stroke + admission_nihss + length_of_admission_days | location_of_stroke,
        overall = c(left = "Overall"),
        data = stroke)
 ```

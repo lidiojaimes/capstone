@@ -13,6 +13,6 @@ detach(stroke)
 ```
 
 ```{r}
-table(stroke$location_of_stroke)
+dim(stroke)
 ```
 
