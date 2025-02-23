@@ -140,6 +140,8 @@ label(stroke$admission_nihss) <- "Admission NIHSS"
 label(stroke$prior_stroke) <- "Prior Stroke"
 label(stroke$length_of_admission_days) <- "Length of Admission"
 label(stroke$covid_19) <- "COVID-19"
+label(stroke$caregiver) <- "Presence of Caregiver"
+
 
 units(stroke$age) <- "years"
 units(stroke$bmi_kg_m_2) <- "kg/m^2"
@@ -147,7 +149,7 @@ units(stroke$cholesterol_mg_d_l) <- "mg/dL"
 units(stroke$length_of_admission_days) <- "days"
 
 table1(~ race + age + sex + bmi_kg_m_2 + cholesterol_mg_d_l + covid_19 +
-         prior_stroke + admission_nihss + length_of_admission_days | location_of_stroke,
+         prior_stroke + caregiver + admission_nihss + length_of_admission_days | location_of_stroke,
        overall = c(left = "Overall"),
        data = stroke)
 ```
@@ -345,18 +347,25 @@ test<-
              multiple_discharge==0 & acute_rehabilitation == 1 ~ "Acute rehabilitation",
              multiple_discharge==0 & subacute_rehabilitation == 1 ~ "Subacute rehabilitation",
              multiple_discharge==0 & inpatient_rehabilitation == 1 ~ "Inpatient rehabilitation",
-             multiple_discharge==0 & assited_living_facility == 1 ~ "Assited living facility",
+             multiple_discharge==0 & assited_living_facility == 1 ~ "Assited living facility", #maybe assisted
              multiple_discharge==0 & home_health == 1 ~ "Home health",
              multiple_discharge==0 & home_with_no_needs == 1 ~ "Home with no needs",
              multiple_discharge==0 & hospice == 1 ~ "Hospice",
              multiple_discharge==0 & other_discharge_location == 1 ~ "Other discharge location",
-             multiple_discharge==1 ~ "multiple discharge",
-             TRUE ~ "other/unknown"),
-         discharge_nihss=as.numeric(discharge_nihss))
+             multiple_discharge==1 ~ "Multiple discharge",
+             TRUE ~ "Unknown"),
+         discharge_info = factor(discharge_info,
+                                 levels = c("Expiration","Acute rehabilitation",
+                                            "Subacute rehabilitation","Inpatient rehabilitation",
+                                            "Assited living facility","Home health","Home with no needs",
+                                            "Hospice","Other discharge location","Multiple discharge",
+                                            "Unknown")))
 
-table1(~ admission_nihss+discharge_nihss|discharge_info,overall = c(left = "Overall"),data=test)
+table(test$discharge_info,useNA = "ifany")
+stroke_raw |> 
+  group_by(other_discharge_location) |> summarise(n())
 
-table(stroke$expiration,useNA = "ifany")
+table(stroke$expiration)
 ```
 
 Everyone (9 patients) with a sum of two for discharge outcomes have home_health and hospice. Only one patient (119) has acute_rehabilitation and home_health.
