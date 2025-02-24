@@ -102,7 +102,12 @@ stroke <-
            presence_of_caregiver == "0" ~ "Absent",
            presence_of_caregiver == "1" ~ "Present",
            TRUE ~ "Unknown"),
-         caregiver = factor(caregiver))
+         caregiver = factor(caregiver),
+         admission_mrs_score = as.numeric(admission_mrs_score),
+         pt_am_pac_score = as.numeric(pt_am_pac_score),
+         discharge_nihss = as.numeric(discharge_nihss),
+         discharge_mrs_score = as.numeric(discharge_mrs_score),
+         ot_am_pac_score = as.numeric(ot_am_pac_score))
 
 stroke[stroke$id_number==532,"race"] = "Other"
 stroke[stroke$id_number==223,"race"] = "Other"
@@ -320,7 +325,7 @@ stroke |>
 ```
 
 
-
+Need to go back in and QA this variable created.
 ```{r Discharge} 
 discharge_info <- 
   stroke |> 
@@ -382,43 +387,59 @@ stroke |>
   select(id_number,date_of_stroke)
 ```
 
-
-Everyone (9 patients) with a sum of two for discharge outcomes have home_health and hospice. Only one patient (119) has acute_rehabilitation and home_health.
-
-For the discharge, make a case_when to include all different levels. starts at discharge (fq) to other discharge location (ga). Expiration is if they died before discharge. Check if they have a yes and a discharge location (quality conflict)
-
 look at insulin as well, medication notes
 
 last known well time (LKWT)
 
-```{r Relationship between outcome variables}
+```{r Score relationship}
 stroke |> 
-  ggplot(aes(x=admission_nihss,y=discharge_nihss))+
+  select(admission_nihss,admission_mrs_score,pt_am_pac_score,
+         discharge_nihss,discharge_mrs_score,ot_am_pac_score) |> 
+  rename(admit_nihss = admission_nihss, 
+         admit_mrs = admission_mrs_score,
+         pt_ampac = pt_am_pac_score,
+         dis_nihss = discharge_nihss,
+         dis_mrs = discharge_mrs_score,
+         ot_ampac = ot_am_pac_score) |> 
+  #na.omit() |> # 115 patients
+  GGally::ggpairs()
+
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=pt_am_pac_score)) + 
   geom_point()
 ```
 
 
-```{r}
-stroke
-```
+```{r Score Correlation}
+stroke |> 
+  select(admission_nihss,admission_mrs_score,pt_am_pac_score,
+         discharge_nihss,discharge_mrs_score,ot_am_pac_score) |> 
+  rename(admit_nihss = admission_nihss, 
+         admit_mrs = admission_mrs_score,
+         pt_ampac = pt_am_pac_score,
+         dis_nihss = discharge_nihss,
+         dis_mrs = discharge_mrs_score,
+         ot_ampac = ot_am_pac_score) |> 
+  na.omit() |> # 115 patients
+  cor() |> 
+  corrplot::corrplot.mixed(tl.cex=.75)
 
+stroke |> 
+  select(admission_nihss,admission_mrs_score,pt_am_pac_score) |> 
+  rename(admit_nihss = admission_nihss, 
+         admit_mrs = admission_mrs_score,
+         pt_ampac = pt_am_pac_score) |> 
+  na.omit() |> # 266 patients
+  cor() |> 
+  corrplot::corrplot.mixed()
 
-```{r inital model}
-mdl1<-lm(admission_nihss~location_of_stroke+prior_stroke+covid_19+race+sex+age+
-           bmi_kg_m_2+cholesterol_mg_d_l+dm+depression+length_of_admission_days,
-         data=stroke)
-summary(mdl1)
-plot(mdl1)
-```
-
-```{r}
-hist(stroke$admission_nihss)
-hist(as.numeric(stroke$discharge_mrs_score))
-
-table(stroke$discharge_mrs_score,useNA="ifany")
-
-stroke$ot_am_pac_score
-table(stroke$pt_am_pac_score,useNA="ifany")
-table(stroke$ot_am_pac_score,useNA="ifany")
+stroke |> 
+  select(discharge_nihss,discharge_mrs_score,ot_am_pac_score) |> 
+  rename(dis_nihss = discharge_nihss,
+         dis_mrs = discharge_mrs_score,
+         ot_ampac = ot_am_pac_score) |> 
+  na.omit() |> # 123 patients
+  cor() |> 
+  corrplot::corrplot.mixed()
 ```
 
