@@ -1,0 +1,173 @@
+---
+title: "Data Cleaning"
+author: "Lidio Jaimes Jr"
+date: "2025-03-10"
+output: html_document
+---
+```{r Importing libraries}
+library(tidyverse)
+library(forcats)
+library(table1)
+```
+
+```{r Reading in Data}
+stroke_raw <- 
+  readxl::read_xlsx("Capstone Combined Data Collection Sheets - Summer 2024.xlsx", 
+                    skip = 1,
+                    na=c("", " ", "UNK", "Unk", "NA", "na", "Na", 9999, "????")) |> 
+  janitor::clean_names()
+stroke <- stroke_raw[-c(1,376), ] #get rid of dictionary and black row
+
+# E336 (patient 333) and E340 (patient 337) have full date instead of just year
+stroke[stroke$id_number == 333, "year_of_birth"] = 1905 #set as 1981 instead of 1905
+stroke[stroke$id_number == 337, "year_of_birth"] = 1942
+stroke$date_identified = openxlsx::convertToDate(stroke$date_identified)
+stroke$date_of_stroke = openxlsx::convertToDate(stroke$date_of_stroke)
+stroke$expiration_date_in_hospital = openxlsx::convertToDate(stroke$expiration_date_in_hospital)
+stroke$expiration_date = openxlsx::convertToDate(stroke$expiration_date)
+stroke$length_of_admission_days = round(as.numeric(stroke$length_of_admission_days),0)
+
+stroke <- 
+  stroke |> 
+  filter(!id_number%in%c(211, 391, 528, 529, 536, 537, 555, 558, 576, 582),
+         !id_number%in%c(316,322),
+         ischemic == 1) 
+```
+
+For notes: Patient 100 has a good bit of missing. Patient 469 was transferred to different hospital. Neither removed yet. Patient 532 has 43 days of admission, but not removed yet.
+
+For paper: Patients 316 (105 days) and 322 (79 days) were removed from analyses. Their length of admission days being so large is likely due to different factors. Patients 211, 528, 529, 536, 537, 555, 558, 576, 582 were all/majority blank and removed from analyses. Patient 391 had repeat MRN and one observation was removed from analyses. Focus on ischemic, so everyone with different type of stroke was removed. Patient 361 has a decimal for length of admission days, was rounded up to 16. 
+
+```{r Data Wrangling}
+stroke$brainstem_stroke_lcation <- as.numeric(stroke$brainstem_stroke_lcation)
+
+stroke <-
+  stroke |>
+  mutate(multiple_locations = ifelse(rowSums(stroke[,106:110], na.rm = TRUE) > 1, 1, 0),
+         location_of_stroke = 
+           case_when(
+             multiple_locations==0 & brainstem_stroke_lcation == 1 ~ "brainstem",
+             multiple_locations==0 & cerebellum_stroke_location == 1 ~ "cerebellum",
+             multiple_locations==0 & cortical_stroke_location == 1 ~ "cortical",
+             multiple_locations==0 & subcortical_stroke_location == 1 ~ "subcortical",
+             multiple_locations==0 & other_stroke_location == 1 ~ "other/unknown",
+             multiple_locations==1 ~ "multiple locations",
+             TRUE ~ "other/unknown"),
+         location_of_stroke = factor(location_of_stroke,
+                                     levels = c("brainstem","cerebellum",
+                                                "cortical","subcortical",
+                                                "other/unknown","multiple locations"),
+                                     labels = c("Brainstem","Cerebellum",
+                                                "Cortical","Subcortical",
+                                                "Unknown","Multiple Locations")),
+         race = ifelse(race=="Other","Other","White"),
+         race = case_when(
+           race == "White" ~ "White",
+           str_detect(patient_identification_notes, "African") ~ "Black",
+           TRUE ~ "Other"),
+         race = factor(race, levels = c("White", "Black", "Other")),
+         age = as.numeric(age),
+         admission_nihss = as.numeric(admission_nihss),
+         cholesterol_mg_d_l = as.numeric(cholesterol_mg_d_l),
+         prior_stroke = case_when(
+           prior_stroke == 0 ~ "No",
+           prior_stroke == 1 ~ "Yes"),
+         prior_tia = case_when(
+           prior_tia == 0 ~ "No",
+           prior_tia == 1 ~ "Yes"),
+         cholesterol_group = case_when(
+           cholesterol_mg_d_l < 200 ~ "Normal",
+           cholesterol_mg_d_l >= 200 & cholesterol_mg_d_l <=239 ~ "Borderline high",
+           cholesterol_mg_d_l >= 240 ~ "High"),
+         cholesterol_group = factor(cholesterol_group,
+                                    levels = c("Normal","Borderline high","High")),
+         cigarette_smoking = case_when(
+           cigarette_smoking == "Former" | cigarette_smoking == "former" ~ "Former",
+           cigarette_smoking == "Never" | cigarette_smoking == "NEver" ~ "Never",
+           cigarette_smoking == "Current" | cigarette_smoking == "Current\r\n\rCurrent" ~ "Current"),
+         cigarette_smoking = factor(cigarette_smoking,
+                                    levels = c("Never","Former","Current")),
+         ischemic_heart_disease = ifelse(ischemic_heart_disease == 0, "No", "Yes"),
+         date_cov19 = ifelse(date_of_stroke>="2020-03-15","after covid","before covid"),
+         covid_19 = ifelse(date_cov19=="before covid","No",covid_19),
+         covid_19 = case_when(
+           covid_19 == "No" ~ "No",
+           covid_19 == "Yes (Once)" ~ "Yes",
+           covid_19 == "positive" ~ "Yes",
+           covid_19 == "negative" ~ "No"),
+         dm = factor(dm,levels=c(0,1),labels=c("No","Yes")),
+         depression = factor(depression,levels=c(0,1),labels=c("No","Yes")),
+         length_of_admission_days = as.numeric(length_of_admission_days),
+         caregiver = case_when(
+           presence_of_caregiver == "0" ~ "Absent",
+           presence_of_caregiver == "1" ~ "Present",
+           TRUE ~ "Unknown"),
+         caregiver = factor(caregiver),
+         admission_mrs_score = as.numeric(admission_mrs_score),
+         pt_am_pac_score = as.numeric(pt_am_pac_score),
+         discharge_nihss = as.numeric(discharge_nihss),
+         discharge_mrs_score = as.numeric(discharge_mrs_score),
+         ot_am_pac_score = as.numeric(ot_am_pac_score))
+
+stroke[stroke$id_number==532,"race"] = "Other"
+stroke[stroke$id_number==223,"race"] = "Other"
+```
+
+Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532 and 223). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis?
+
+Notes for paper: weird entry for presence of caregiver for 18, set as unknown.
+
+# Discharge Destinations (needs work)
+Need to go back in and QA this variable created.
+```{r Discharge} 
+discharge_info <- 
+  stroke |> 
+  select(id_number,expiration,acute_rehabilitation,subacute_rehabilitation,
+         inpatient_rehabilitation,assited_living_facility,home_health,
+         home_with_no_needs,hospice,other_discharge_location) |> 
+  sapply(as.numeric) |> 
+  as.data.frame()
+
+discharge_info |> 
+  mutate(sum_discharge=apply(discharge_info[3:9],1,sum)) |> 
+  filter(sum_discharge==2)
+
+
+stroke[, c(172,174:177,179:182)] <- lapply(stroke[, c(172,174:177,179:182)], as.numeric)
+
+test<-
+  stroke |> 
+  mutate(multiple_discharge = 
+           ifelse(rowSums(stroke[,c(172,174:177,179:182)], na.rm = TRUE) > 1, 1, 0),
+         discharge_info = 
+           case_when(
+             multiple_discharge==0 & expiration == 1 ~ "Expiration",
+             multiple_discharge==0 & acute_rehabilitation == 1 ~ "Acute rehabilitation",
+             multiple_discharge==0 & subacute_rehabilitation == 1 ~ "Subacute rehabilitation",
+             multiple_discharge==0 & inpatient_rehabilitation == 1 ~ "Inpatient rehabilitation",
+             multiple_discharge==0 & assited_living_facility == 1 ~ "Assited living facility", #maybe assisted
+             multiple_discharge==0 & home_health == 1 ~ "Home health",
+             multiple_discharge==0 & home_with_no_needs == 1 ~ "Home with no needs",
+             multiple_discharge==0 & hospice == 1 ~ "Hospice",
+             multiple_discharge==0 & other_discharge_location == 1 ~ "Other discharge location",
+             multiple_discharge==1 ~ "Multiple discharge",
+             TRUE ~ "Unknown"),
+         discharge_info = factor(discharge_info,
+                                 levels = c("Expiration","Acute rehabilitation",
+                                            "Subacute rehabilitation","Inpatient rehabilitation",
+                                            "Assited living facility","Home health","Home with no needs",
+                                            "Hospice","Other discharge location","Multiple discharge",
+                                            "Unknown")))
+
+table(test$discharge_info,useNA = "ifany")
+stroke_raw |> 
+  group_by(other_discharge_location) |> summarise(n())
+
+table(stroke$expiration)
+```
+
+Everyone (9 patients) with a sum of two for discharge outcomes have home_health and hospice. Only one patient (119) has acute_rehabilitation and home_health.
+
+For the discharge, make a case_when to include all different levels. starts at discharge (fq) to other discharge location (ga). Expiration is if they died before discharge. Check if they have a yes and a discharge location (quality conflict)
+
+can also look at these variables: look at insulin as well, medication notes, last known well time (LKWT)
