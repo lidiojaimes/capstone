@@ -1,0 +1,274 @@
+---
+title: "Data Exploration"
+author: "Lidio Jaimes Jr"
+date: "2024-10-21"
+output: pdf_document
+---
+```{r Table 1: Patient Demographics}
+label(stroke$race) <- "Race"
+label(stroke$age) <- "Age"
+label(stroke$sex) <- "Sex"
+label(stroke$bmi_kg_m_2) <- "BMI"
+label(stroke$cholesterol_mg_d_l) <- "Cholesterol"
+label(stroke$admission_nihss) <- "Admission NIHSS"
+label(stroke$prior_stroke) <- "Prior Stroke"
+label(stroke$length_of_admission_days) <- "Length of Admission"
+label(stroke$covid_19) <- "COVID-19"
+label(stroke$caregiver) <- "Presence of Caregiver"
+
+
+units(stroke$age) <- "years"
+units(stroke$bmi_kg_m_2) <- "kg/m^2"
+units(stroke$cholesterol_mg_d_l) <- "mg/dL"
+units(stroke$length_of_admission_days) <- "days"
+
+table1(~ race + age + sex + bmi_kg_m_2 + cholesterol_mg_d_l + covid_19 +
+         prior_stroke + caregiver + admission_nihss + length_of_admission_days | location_of_stroke,
+       overall = c(left = "Overall"),
+       data = stroke)
+```
+
+```{r Figure 1: Missingness}
+stroke_variables<-
+  stroke |> 
+  select(race,age,sex,bmi_kg_m_2,cholesterol_mg_d_l,prior_stroke,admission_nihss,covid_19)
+
+VIM::aggr(stroke_variables,
+          col = c("blue","red"),
+          numbers = TRUE,
+          labels = c("Race","Age","Sex","BMI","Cholesterol",
+                     "Prior Stroke","Entry NIHSS","COVID-19"),
+          ylab = c("Histogram of missing data", "Pattern"))
+```
+
+
+```{r Figure 2 : Stroke location vs NIHSS}
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Admission NIHSS") + 
+  ylab("Location of Stroke")
+```
+
+Using cutoffs from JHU, hopkinsmedicine.org
+```{r Figure 3: Obesity}
+stroke |> 
+  ggplot(aes(x = admission_nihss, y = bmi_kg_m_2, color = cholesterol_group)) +
+  scale_color_manual(name = "Cholesterol Group",
+                     labels = c("Normal","Boderline High","High"),
+                     values = c("red","blue", "green")) + 
+  geom_point() + 
+  labs(x = "Admission NIHSS", y = "BMI") + 
+  theme_bw() +
+  geom_hline(yintercept=18.5, linetype="dashed", color = "black") +
+  geom_hline(yintercept=25, linetype="dashed", color = "black")+
+  theme(legend.position = "bottom")
+
+```
+
+```{r Figure 4: Diabetes}
+stroke |> 
+  group_by(location_of_stroke,dm) |> 
+  summarise(median_nihss=median(admission_nihss,na.rm=TRUE)) |> 
+  filter(!is.na(dm)) |> 
+  ggplot(aes(x = (location_of_stroke),
+             y = median_nihss,
+             fill = dm)) + 
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, color="black") +
+  scale_fill_manual(name = "Diabetic",
+                     labels = c("No","Yes"),
+                     values = c("red","blue")) + 
+  theme_bw() +
+  xlab("Location of Stroke") + 
+  ylab("Median Admission NIHSS Score")
+```
+
+```{r Figure 5: location of stroke vs age}
+stroke |> 
+  ggplot(aes(x=age,y=fct_rev(location_of_stroke),fill=location_of_stroke)) + 
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Age") + 
+  ylab("Location of Stroke")
+```
+
+```{r Figure 6: Smoking history vs NIHSS}
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=fct_rev(cigarette_smoking),fill=cigarette_smoking)) + 
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Admission NIHSS") + 
+  ylab("Smoking History")
+```
+
+This is about COVID-19 variable: 
+```{r Table 2: COVID-19}
+stroke[stroke$id_number==48,"covid_19_notes"] = "2022-09-18"
+stroke[stroke$id_number==139,"covid_19_notes"] = "2021-09-19"
+stroke[stroke$id_number==143,"covid_19_notes"] = "2021-07-27"
+stroke[stroke$id_number==168,"covid_19_notes"] = "2022-01-31"
+
+stroke |> 
+  mutate(covid_19=factor(covid_19,levels=c("Yes","No"))) |> 
+  rename(`COVID-19`=covid_19) |> 
+  group_by(`COVID-19`) |> 
+  summarise(n())
+
+#kableExtra::kable(ppt_tbl)
+```
+
+Patients 4, 48, 103, 139, 143, and 168 all have "Yes (Once)" for COVID-19 variable, even though they had a stroke prior to the COVID-19 date 2020-03-15. 
+
+```{r Figure 7: COVID}
+stroke |> 
+  mutate(covid_19=case_when(covid_19=="Yes"~"Yes",covid_19=="No"~"No",is.na(covid_19)~"NA"),
+         covid_19=factor(covid_19)) |> 
+  ggplot(aes(x=admission_nihss,y=covid_19,fill=covid_19)) + 
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Admission NIHSS") + 
+  ylab("COVID-19")
+```
+
+Is the COVID variable whether they have any history or if it's present when they had stroke? maybe a mix of both? Patient 72 tested positive for COVID on 7/21/21 and their date of stroke is 11/5/20. The COVID-19 notes is that the patient expired on 7/27/21 secondary to COVID-19. The cutoff date for COVID is 3/15/20
+
+```{r Figure 8: Heart disease vs NIHSS}
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=fct_rev(ischemic_heart_disease),fill=ischemic_heart_disease)) + 
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Admission NIHSS") + 
+  ylab("Ischemic Heart Disease History")
+```
+
+```{r Figure 9: Depression vs Length of Admission}
+stroke |> select(id_number,length_of_admission_days,date_of_stroke,expiration_date_in_hospital,expiration_date)
+
+stroke |>
+  mutate(expiration = factor(expiration, levels = c(0, 1), labels = c("No", "Yes"))) |> 
+  filter(expiration=="No") |> 
+  ggplot(aes(x=length_of_admission_days,y=depression,fill=depression))+
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Length of Admission (days)") + 
+  ylab("Depression")
+
+stroke |>
+  mutate(expiration = factor(expiration, levels = c(0, 1), labels = c("No", "Yes"))) |> 
+  filter(expiration=="No") |> 
+  ggplot(aes(x=length_of_admission_days,y=depression,fill=depression))+
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Length of Admission (days)") + 
+  ylab("Depression")
+
+
+stroke |>
+  mutate(expiration = factor(expiration, levels = c(0, 1), labels = c("No", "Yes"))) |> 
+  filter(length_of_admission_days<75) |> 
+  ggplot(aes(x=length_of_admission_days,y=depression,fill=expiration))+
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,alpha=.2)+
+  theme_bw() +
+  xlab("Length of Admission (days)") + 
+  ylab("Depression")
+
+stroke |>
+  filter(length_of_admission_days<75) |> 
+  ggplot()+
+  geom_violin(aes(x=length_of_admission_days,y=depression,fill=expiration)) + 
+  geom_boxplot(aes(x=length_of_admission_days,y=depression,fill=expiration),alpha=.2)+
+  theme_bw() +
+  xlab("Length of Admission (days)") + 
+  ylab("Depression")
+```
+
+Patient 80 has length of admission days as 3, but they died 5 days after stroke. Patient 101. **NEED** to ask about length_of_admission_days variable. 
+
+```{r Figure 10: Depression vs NIHSS}
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=depression,fill=depression))+
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Admission NIHSS") + 
+  ylab("Depression")
+```
+
+```{r Score completeness}
+table(is.na(stroke$pt_am_pac_score))
+table(is.na(stroke$admission_mrs_score))
+table(is.na(stroke$admission_nihss))
+
+stroke |> 
+  filter(is.na(pt_am_pac_score),is.na(admission_mrs_score),is.na(admission_nihss)) |>
+  select(id_number,date_of_stroke)
+```
+
+```{r Score relationship}
+stroke |> 
+  select(admission_nihss,admission_mrs_score,pt_am_pac_score,
+         discharge_nihss,discharge_mrs_score,ot_am_pac_score) |> 
+  rename(admit_nihss = admission_nihss, 
+         admit_mrs = admission_mrs_score,
+         pt_ampac = pt_am_pac_score,
+         dis_nihss = discharge_nihss,
+         dis_mrs = discharge_mrs_score,
+         ot_ampac = ot_am_pac_score) |> 
+  #na.omit() |> # 115 patients
+  GGally::ggpairs()
+
+stroke |> 
+  ggplot(aes(x=admission_nihss,y=pt_am_pac_score)) + 
+  geom_point()
+```
+
+```{r Score Correlation}
+stroke |> 
+  select(admission_nihss,admission_mrs_score,pt_am_pac_score,
+         discharge_nihss,discharge_mrs_score,ot_am_pac_score) |> 
+  rename(admit_nihss = admission_nihss, 
+         admit_mrs = admission_mrs_score,
+         pt_ampac = pt_am_pac_score,
+         dis_nihss = discharge_nihss,
+         dis_mrs = discharge_mrs_score,
+         ot_ampac = ot_am_pac_score) |> 
+  na.omit() |> # 115 patients
+  cor() |> 
+  corrplot::corrplot.mixed(tl.cex=.75)
+
+stroke |> 
+  select(admission_nihss,admission_mrs_score,pt_am_pac_score) |> 
+  rename(admit_nihss = admission_nihss, 
+         admit_mrs = admission_mrs_score,
+         pt_ampac = pt_am_pac_score) |> 
+  na.omit() |> # 266 patients
+  cor() |> 
+  corrplot::corrplot.mixed()
+
+stroke |> 
+  select(discharge_nihss,discharge_mrs_score,ot_am_pac_score) |> 
+  rename(dis_nihss = discharge_nihss,
+         dis_mrs = discharge_mrs_score,
+         ot_ampac = ot_am_pac_score) |> 
+  na.omit() |> # 123 patients
+  cor() |> 
+  corrplot::corrplot.mixed()
+```
+
