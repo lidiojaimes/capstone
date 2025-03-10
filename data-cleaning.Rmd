@@ -2,7 +2,7 @@
 title: "Data Cleaning"
 author: "Lidio Jaimes Jr"
 date: "2025-03-10"
-output: html_document
+output: pdf_document
 ---
 ```{r Importing libraries}
 library(tidyverse)
@@ -87,7 +87,11 @@ stroke <-
            cigarette_smoking == "Current" | cigarette_smoking == "Current\r\n\rCurrent" ~ "Current"),
          cigarette_smoking = factor(cigarette_smoking,
                                     levels = c("Never","Former","Current")),
-         ischemic_heart_disease = ifelse(ischemic_heart_disease == 0, "No", "Yes"),
+         #ischemic_heart_disease = ifelse(ischemic_heart_disease == 0, "No", "Yes"),
+         ischemic_heart_disease = as.numeric(ischemic_heart_disease),
+         htn = as.numeric(htn),
+         antidepressant_use = as.numeric(antidepressant_use),
+         anxiolytic_use = as.numeric(anxiolytic_use),
          date_cov19 = ifelse(date_of_stroke>="2020-03-15","after covid","before covid"),
          covid_19 = ifelse(date_cov19=="before covid","No",covid_19),
          covid_19 = case_when(
@@ -95,6 +99,12 @@ stroke <-
            covid_19 == "Yes (Once)" ~ "Yes",
            covid_19 == "positive" ~ "Yes",
            covid_19 == "negative" ~ "No"),
+         antidep_arrival = ifelse(antidepressant_use == 1, 1, 0),
+         anxio_arrival = ifelse(anxiolytic_use == 1, 1, 0),
+         statin_arrival = 
+           ifelse(str_detect(medication_list_at_arrival, "Statin"), 1, 0),
+         # anticoag_arrival =
+         #   ifelse(str_detect(medication_list_at_arrival, "Anticoagulants"), 1, 0),
          dm = factor(dm,levels=c(0,1),labels=c("No","Yes")),
          depression = factor(depression,levels=c(0,1),labels=c("No","Yes")),
          length_of_admission_days = as.numeric(length_of_admission_days),
@@ -116,6 +126,8 @@ stroke[stroke$id_number==223,"race"] = "Other"
 Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532 and 223). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis?
 
 Notes for paper: weird entry for presence of caregiver for 18, set as unknown.
+
+**medication** use (anticoagulants, statins, antidepressants, anxiolytics): Medication data at arrival only available from patients 375 and onward (some still missing after). What is the reason? What is the purpose of medication list at arrival notes? Is list one just generic and notes the specific medication? Made antidepressant and anxiolytic an indicator variable for wheter or not taking before stroke. There is no variable for anticoagulants?
 
 # Discharge Destinations (needs work)
 Need to go back in and QA this variable created.
