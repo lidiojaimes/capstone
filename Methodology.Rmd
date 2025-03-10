@@ -4,10 +4,72 @@ author: "Lidio Jaimes Jr"
 date: "2025-02-21"
 output: pdf_document
 ---
-$$E[\text{length of admission days}] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{StrokeLocation}_i + \beta_3\text{CaregiverPresence}_i + \\ \beta_4\text{Medication}_i + \beta_5\text{PriorStroke}_i + \beta_6\text{Race}_i + \beta_7\text{Age}_i + \beta_8\text{Sex}_i + \beta_9\text{BMI}_i + \beta_{10}\text{Cholesterol}_i + \epsilon_i$$
+A predictive model in acute stroke patient's care incorporating pre-existing conditions (diabetes, hypertension, CAD, ischemic heart disease), lifestyle factors (smoking, obesity, hypercholesterolemia), socioeconomic, demographic factors, presence of caregiver and medication use (anticoagulants, statins, antidepressants, anxiolytics) will estimate patients' length of hospital stay at initial assessment.
+
+$$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{StrokeLocation}_i + \beta_3\text{CaregiverPresence}_i + \\ \beta_4\text{PriorStroke}_i + \beta_5\text{Race}_i + \beta_6\text{Age}_i + \beta_7\text{Sex}_i + \beta_8\text{BMI}_i + \beta_{9}\text{Cholesterol}_i + \beta_{10}\text{Diabetes} + \\ \beta_{11}\text{Anticoagulants}_i + \beta_{12}\text{Statins}_i + \beta_{13}\text{Antidepressants}_i + \beta_{14}\text{Anxiolytics}_i+ \\ \beta_{14}\text{Hypertension} + \beta_{15}\text{IschemicHeartDisease} + \epsilon_i$$
 
 $$E[\text{length of admission days}] = \beta_0 + \beta_1\text{AdmitNIHSS}_i + \beta_2\text{StrokeLocation}_i + \overrightarrow{\boldsymbol{\gamma}}^T\overrightarrow{\boldsymbol{z}_i}$$
 
+```{r Subsetting}
+mdl1_data <- 
+  stroke |> 
+  mutate(
+    caregiver = case_when(
+      caregiver == "Present" ~ 1,
+      caregiver == "Absent" ~ 0),
+    prior_stroke = case_when(
+      prior_stroke == "No" ~ 0,
+      prior_stroke == "Yes" ~ 1),
+    sex_male = ifelse(sex == "Male", 1, 0),
+    dm = ifelse(dm == "No", 0, 1),
+    id_number = as.numeric(id_number)) |>
+  select(id_number,length_of_admission_days, admission_nihss, admission_mrs_score, 
+         location_of_stroke, caregiver, prior_stroke, race, age, sex_male, 
+         bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
+         statin_arrival, htn, ischemic_heart_disease)
+```
+
+1. Should we make an obesity indicator variable? Currently using BMI and Cholesterol. BMI has clear obesity cut off. 
+2. Look at CAD and anticoagulants
+
+```{r Completeness}
+mdl1_data_complete = mdl1_data[complete.cases(mdl1_data),]
+
+visdat::vis_miss(mdl1_data) +
+  labs(title="Missingness in stroke data")
+#this tells us that a lot of missing cases comes from statin variable, which was expected.
+
+VIM::aggr(mdl1_data[,-16],
+          col = c("blue","red"),
+          numbers = TRUE,
+          labels = names(mdl1_data[,-16]),
+          cex.axis=.4, gap=3,
+          ylab = c("Histogram of missing data", "Pattern"))
+
+mdl1_data_complete_exclStatin = 
+  mdl1_data[,-16] |> na.omit()
+```
 
 
+```{r}
+mdl1 <-
+  lm(length_of_admission_days ~ admission_nihss + admission_mrs_score + 
+     location_of_stroke + caregiver + prior_stroke + race + age+ sex_male + 
+     bmi_kg_m_2 + cholesterol_mg_d_l + dm + antidep_arrival + anxio_arrival +
+     statin_arrival + htn, data = mdl1_data_complete)
+summary(mdl1)
+plot(mdl1)
+```
+
+Will potentially use a robust variance estimator. First need to see what residual plot looks like after multiple imputation via MICE package. 
+
+```{r}
+mdl1_exclStatin <-
+  lm(length_of_admission_days ~ admission_nihss + admission_mrs_score + 
+     location_of_stroke + caregiver + prior_stroke + race + age+ sex_male + 
+     bmi_kg_m_2 + cholesterol_mg_d_l + dm + antidep_arrival + anxio_arrival + 
+     htn, data = mdl1_data_complete_exclStatin)
+summary(mdl1_exclStatin)
+plot(mdl1_exclStatin)
+```
 
