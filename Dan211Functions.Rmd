@@ -339,6 +339,191 @@ linContr.glm <- function(contr.names, contr.coef = rep(1, length(contr.names)),
                                                               "log")), "exp( Est )", "Est")
   round(rslt, 3)
 }
-
-		
 ```
+
+
+# Tables from Christina
+```{r regression tables}
+format_lm_output <- function(data, sigfigs = 2, robust = TRUE){
+  ########## round significant figures 
+  ########## use the format function with nsmall and digits = 2
+  ########## exp( Est ) ci95.lo ci95.hi  z value Pr(>|z|)
+  #keep <- c("exp( Est )", "ci95.lo", "ci95.hi", "Pr(>|z|)")
+  # Est ci95.lo ci95.hi t value Pr(>|t|)
+  
+  if(robust){
+    ### "Est", "robust ci95.lo", "robust ci95.hi", "robust z value", "robust Pr(>|z|)"
+    keep <- c("Est", "robust ci95.lo", "robust ci95.hi", "robust Pr(>|t|)")
+  } else {
+    keep <- c("Est", "ci95.lo", "ci95.hi", "Pr(>|t|)")
+  }
+  ### if you are using a robust variance your arguments would be 
+  
+  output <- data[ , colnames(data) %in% keep]
+  colnames(output) <- c("Est", "ci95.lo", "ci95.hi", "pval")
+  output <- as.data.frame(output)
+  
+  output <- cbind(format(output$Est, nsmall = sigfigs , digits = sigfigs, scientific = FALSE )
+                  , paste("(", format(output$ci95.lo, nsmall = sigfigs , digits = sigfigs, scientific = FALSE ), ",", format(output$ci95.hi, nsmall = sigfigs , digits = sigfigs, scientific = FALSE ),")")
+                  , format(output$pval, nsmall = sigfigs, digits = sigfigs, scientific = FALSE)
+  )
+  
+  colnames(output) <- c("Est", "95 C.I.", "P-Val")
+  rownames(output) <- rownames(data)
+  
+  return(output)
+  
+}
+
+
+table1_descriptive <- function(data, vars, group, categorical){
+  # , sigdigits=2 may want to add this argument in later 
+  
+  n.var <- length(vars)
+  
+  groupcounts <- table(data[ , colnames(data) %in% group])
+  
+  groupNum <- paste("N = ", groupcounts)
+  table_1 <- rbind(rownames(groupcounts), groupNum)
+  
+  for (i in 1:n.var) {
+    
+    if(vars[i] %in% categorical){
+      
+      counts <- table(data[ , colnames(data) %in% vars[i] ], data[, colnames(data) %in% group], useNA = "ifany")
+      
+      freq <- counts / matrix(rep(groupcounts, each = dim(counts)[1]), nrow = dim(counts)[1])
+      freq <- format(freq, nsmall = 1, digits = 1)
+      counts <- format(counts, nsmall = 2, digits = 2)
+      
+      temp <- matrix(paste(counts, "(", freq, ")"), nrow = dim(counts)[1]) # will have to format significant figures 
+      rownames(counts) <- ifelse(is.na(rownames(counts)), "Missing", rownames(counts))
+      rownames(temp) <- paste("    ", rownames(counts)) #for excel table 
+      #rownames(temp) <- ifelse(is.na(rownames(temp)), "Missing", rownames(temp))
+      #rownames(temp) <- paste("\\indent ", rownames(counts))
+      #rownames(temp) <- paste("\\hspace{3mm} ", rownames(counts))
+      #colnames(temp) <- colnames(counts)
+      #colnames(temp) <- ifelse(is.na(colnames(temp)), "Missing", colnames(temp))
+      
+      filler <- matrix(rep("", length(groupcounts)), nrow = 1)
+      rownames(filler) <- vars[i]
+      colnames(filler) <- colnames(counts)
+      
+      table_1 <- rbind(table_1, filler, temp) 
+      # appending to table 1
+      
+      
+    } else{
+      
+      ########## mean 
+      means_group <- tapply(data[ , colnames(data) %in% vars[i] ], data[, colnames(data) %in% group], mean, na.rm=TRUE)
+      
+      ########### formating sig figs
+      means_group <- format(means_group, nsmall = 2, digits = 2)
+      
+      
+      ############ sd 
+      sds_group <- tapply(data[ , colnames(data) %in% vars[i] ], data[, colnames(data) %in% group], sd, na.rm=TRUE)
+      
+      
+      ########### formating sig figs
+      sds_group  <- format(sds_group, nsmall = 2, digits = 2)
+      
+      
+      
+      temp <- matrix(paste(means_group, "(", sds_group, ")"), nrow = 1) 
+      
+      colnames(temp) <- rownames(means_group)
+      rownames(temp) <- vars[i]
+      
+      table_1 <- rbind(table_1, temp) 
+      
+      
+    }
+    
+    
+  }
+  
+  return(table_1)
+}
+
+dfbeta_lm_plots <- function(fit_model){
+
+  deltabetas_model <- dfbeta(fit_model)
+  
+  for (i in 1:dim(deltabetas_model)[2]) {
+    plot(seq(1:dim(deltabetas_model)[1]), deltabetas_model[, i], main = colnames(deltabetas_model)[i])
+    
+    # Add observation numbers as labels
+    text(
+      x = rownames(deltabetas_model), 
+      y = deltabetas_model[, i], 
+      labels = rownames(deltabetas_model), 
+      pos = 4,  # Position labels to the right of the points
+      cex = 0.7, # Size of text
+      col = "red"
+    )
+  }
+}
+
+format_geeConstrast <- function(data_t){
+  
+  
+  output <- cbind(
+    data_t$Est
+    , paste("(", data_t$ci95.lo, ",", data_t$ci95.hi, ")")
+    , data_t$pVal)
+  return(output)
+  
+}
+
+dfbeta_geeglm_plots <- function(fit_model, data, family = gaussian, corstr = "ar1"){
+  ######### library(geepack) using this function 
+  #fit_model <- modelBaseline
+  # data = ds_long_base
+  
+  gee_formula <- formula(fit_model)
+  
+  x_design <- as.data.frame(model.matrix(fit_model))
+  subject_id <- data$subject_id[rownames(data) %in% as.numeric(rownames(x_design))]
+  #y_vector <- model.response(model.frame(fit_model))
+  #data_model <- as.data.frame(cbind(y_vector, x_design, subject_id))
+  
+  sub_unique <- unique(subject_id)
+  n_unique <- length(sub_unique)
+  
+  beta0 <- coefficients(fit_model)
+  
+  
+  delta_betas <- matrix(NA, ncol = dim(x_design)[2], nrow = n_unique)
+  colnames(delta_betas) <- colnames(x_design)
+  rownames(delta_betas) <- sub_unique 
+  
+  for (i in 1:n_unique) {
+    delta_betas[i, ] <- coefficients(geeglm( gee_formula
+                                             ,id = subject_id,
+                                             data = data[data$subject_id != sub_unique[i],] ,
+                                             ,family = family
+                                             ,na.action = na.omit
+                                             ,corstr = corstr)) - beta0
+  }
+  
+  
+  for (i in 1:dim(delta_betas)[2]) {
+    plot(seq(1:dim(delta_betas)[1]), delta_betas[, i], main = colnames(delta_betas)[i])
+    
+    # Add observation numbers as labels
+    text(
+      x = seq(1:dim(delta_betas)[1]), 
+      y = delta_betas[, i], 
+      labels = unique(subject_id), 
+      pos = 4,  # Position labels to the right of the points
+      cex = 0.7, # Size of text
+      col = "red"
+    )
+  }
+  
+  return(list(deltabetas = delta_betas))
+}
+```
+
