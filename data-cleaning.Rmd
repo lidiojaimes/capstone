@@ -50,16 +50,14 @@ stroke <-
              multiple_locations==0 & cerebellum_stroke_location == 1 ~ "cerebellum",
              multiple_locations==0 & cortical_stroke_location == 1 ~ "cortical",
              multiple_locations==0 & subcortical_stroke_location == 1 ~ "subcortical",
-             multiple_locations==0 & other_stroke_location == 1 ~ "other/unknown",
-             multiple_locations==1 ~ "multiple locations",
-             TRUE ~ "other/unknown"),
+             multiple_locations==1 ~ "multiple locations"),
          location_of_stroke = factor(location_of_stroke,
                                      levels = c("brainstem","cerebellum",
                                                 "cortical","subcortical",
-                                                "other/unknown","multiple locations"),
+                                                "multiple locations"),
                                      labels = c("Brainstem","Cerebellum",
                                                 "Cortical","Subcortical",
-                                                "Unknown","Multiple Locations")),
+                                                "Multiple Locations")),
          race = ifelse(race=="Other","Other","White"),
          race = case_when(
            race == "White" ~ "White",
@@ -128,6 +126,15 @@ Patients with Race classified as other are either: Other(Native American and Nat
 Notes for paper: weird entry for presence of caregiver for 18, set as unknown.
 
 **medication** use (anticoagulants, statins, antidepressants, anxiolytics): Medication data at arrival only available from patients 375 and onward (some still missing after). What is the reason? What is the purpose of medication list at arrival notes? Is list one just generic and notes the specific medication? Made antidepressant and anxiolytic an indicator variable for wheter or not taking before stroke. There is no variable for anticoagulants?
+
+
+
+
+
+
+
+
+
 
 # Discharge Destinations (needs work)
 Need to go back in and QA this variable created.
