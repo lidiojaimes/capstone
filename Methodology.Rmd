@@ -70,10 +70,15 @@ imputed_df <- do.call(rbind, imputed_datasets)
 imputed_df$imputation <- rep(1:5, each = n)
 imputed_df
 mdl1_data
+
+imputed_data <-
+  mdl1_data |> 
+  select_if(is.numeric) |> 
+  mice(method = "norm.nob", m = 5, print = FALSE, seed = 5010)
 ```
 
 
-```{r}
+```{r Full model}
 mdl1 <-
   lm(length_of_admission_days ~ admission_nihss + admission_mrs_score + 
        location_of_stroke + caregiver + prior_stroke + race + sex_male + 
@@ -84,8 +89,48 @@ summary(mdl1)
 plot(mdl1)
 ```
 
-```{r}
-step(mdl1)
+```{r Robust Variance Estimator for Full model}
+#Run Dan211Functions First
+library(kableExtra)
+full_model_table <- lmCI(mdl1, robust = TRUE)
+rownames(full_model_table) <- 
+  c("Intercept", "Admission NIHSS", "Admission MRS", 
+    "Diff b/w Multiple locations & Cortical", 
+    "Diff b/w Subcortical & Cortical",
+    "Diff b/w Cerebellum & Cortical",
+    "Diff b/w Brainstem & Cortical",
+    "Caregiver", "Prior Stroke", "Diff b/w Black & White", 
+    "Diff b/w Other & White", "Diff b/w Male & Female",
+    "BMI", "Cholesterol", "Diabetes", 
+    "Antidepressants at Arrival", "Anxiolytic at Arrival", 
+    "Centered Age per 10 years", "Statin at Arrival", "Hypertension", 
+    "Ischemic Heart Disease")
+full_final_table <- kable(format_lm_output(full_model_table), file = "html",
+      caption = "Stroke Model Using All Covariates and Robust Variance Estimator")
+full_final_table
+```
+
+```{r Stepwise}
+#step(mdl1)
+mdl1_step <- 
+  lm(length_of_admission_days ~ admission_nihss + admission_mrs_score + 
+       race + cholesterol_mg_d_l + I((age - mean(age))/10), 
+     data = mdl1_data_complete)
+summary(mdl1_step)
+plot(mdl1_step)
+```
+
+```{r Robust Variance Estimator for Stepwise}
+#Run Dan211Functions First
+library(kableExtra)
+step_model_table <- lmCI(mdl1_step, robust = TRUE)
+rownames(step_model_table) <- 
+  c("Intercept", "Admission NIHSS", "Admission MRS", 
+    "Diff b/w Black & White", "Diff b/w Other & White", 
+    "Cholesterol", "Centered Age per 10 years")
+step_final_table <- kable(format_lm_output(step_model_table), file = "html",
+      caption = "Stroke Model Using Stepwise Covariates and Robust Variance Estimator")
+step_final_table
 ```
 
 Final model suggested is: 
@@ -93,25 +138,18 @@ $$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS} + \be
 
 Will potentially use a robust variance estimator. First need to see what residual plot looks like after multiple imputation via MICE package. 
 
+# Interaction terms
 
-
-
-
-```{r}
-mdl1_exclStatin <-
+```{r Full model}
+mdl1_interactions <-
   lm(length_of_admission_days ~ admission_nihss + admission_mrs_score + 
        location_of_stroke + caregiver + prior_stroke + race + sex_male + 
        bmi_kg_m_2 + cholesterol_mg_d_l + dm + antidep_arrival + anxio_arrival +
-       I((age - mean(age))/10) + htn, data = mdl1_data_complete_exclStatin)
-summary(mdl1_exclStatin)
-plot(mdl1_exclStatin)
+       I((age - mean(age))/10) + statin_arrival + htn + ischemic_heart_disease +
+       admission_nihss:admission_mrs_score + bmi_kg_m_2:cholesterol_mg_d_l +
+       admission_nihss:location_of_stroke, 
+     data = mdl1_data_complete)
+summary(mdl1_interactions)
+plot(mdl1_interactions)
 ```
 
-```{r}
-step(mdl1_exclStatin)
-```
-
-Final model suggested is: 
-$$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS} + \beta_2\text{AdmissionMRS} + \beta_3\text{Sex} + \\ \beta_4\text{Cholesterol}+ \beta_5\text{Age/10yrs} + \beta_6\text{Hypertension} + \epsilon$$
-
-From the medical side, which interactions should be considered?
