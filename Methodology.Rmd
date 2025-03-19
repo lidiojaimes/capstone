@@ -6,7 +6,7 @@ output: pdf_document
 ---
 A predictive model in acute stroke patient's care incorporating pre-existing conditions (diabetes, hypertension, CAD, ischemic heart disease), lifestyle factors (smoking, obesity, hypercholesterolemia), socioeconomic, demographic factors, presence of caregiver and medication use (anticoagulants, statins, antidepressants, anxiolytics) will estimate patients' length of hospital stay at initial assessment.
 
-$$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{StrokeLocation}_i + \beta_3\text{CaregiverPresence}_i + \\ \beta_4\text{PriorStroke}_i + \beta_5\text{Race}_i + \beta_6\text{Age}_i + \beta_7\text{Sex}_i + \beta_8\text{BMI}_i + \beta_{9}\text{Cholesterol}_i + \beta_{10}\text{Diabetes} + \\ \beta_{11}\text{Anticoagulants}_i + \beta_{12}\text{Statins}_i + \beta_{13}\text{Antidepressants}_i + \beta_{14}\text{Anxiolytics}_i+ \\ \beta_{14}\text{Hypertension} + \beta_{15}\text{IschemicHeartDisease} + \epsilon_i$$
+$$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{StrokeLocation}_i + \beta_3\text{CaregiverPresence}_i + \\ \beta_4\text{PriorStroke}_i + \beta_5\text{Race}_i + \beta_6\text{Age}_i + \beta_7\text{Sex}_i + \beta_8\text{BMI}_i + \beta_{9}\text{Cholesterol}_i + \beta_{10}\text{Diabetes} + \\ + \beta_{11}\text{Statins}_i + \beta_{12}\text{Antidepressants}_i + \beta_{13}\text{Anxiolytics}_i+ \\ \beta_{14}\text{Hypertension} + \beta_{15}\text{IschemicHeartDisease} + \epsilon_i$$
 
 $$E[\text{length of admission days}] = \beta_0 + \beta_1\text{AdmitNIHSS}_i + \beta_2\text{StrokeLocation}_i + \overrightarrow{\boldsymbol{\gamma}}^T\overrightarrow{\boldsymbol{z}_i}$$
 
@@ -153,3 +153,70 @@ summary(mdl1_interactions)
 plot(mdl1_interactions)
 ```
 
+# Ignoring statin medication at arrival
+```{r Subsetting}
+mdl1_data <- 
+  stroke |> 
+  mutate(
+    caregiver = case_when(
+      caregiver == "Present" ~ 1,
+      caregiver == "Absent" ~ 0),
+    prior_stroke = case_when(
+      prior_stroke == "No" ~ 0,
+      prior_stroke == "Yes" ~ 1),
+    sex_male = ifelse(sex == "Male", 1, 0),
+    dm = ifelse(dm == "No", 0, 1),
+    id_number = as.numeric(id_number),
+    location_of_stroke = 
+      factor(location_of_stroke,
+             levels = c("Cortical","Multiple Locations",
+                        "Subcortical","Cerebellum",
+                        "Brainstem"))) |> 
+  select(id_number,length_of_admission_days, admission_nihss, admission_mrs_score, 
+         location_of_stroke, caregiver, prior_stroke, race, age, sex_male, 
+         bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
+         htn, ischemic_heart_disease)
+mdl1_data_complete = mdl1_data[complete.cases(mdl1_data),]
+```
+
+```{r Full model}
+mdl1 <-
+  lm(length_of_admission_days ~ admission_nihss + admission_mrs_score + 
+       location_of_stroke + caregiver + prior_stroke + race + sex_male + 
+       bmi_kg_m_2 + cholesterol_mg_d_l + dm + antidep_arrival + anxio_arrival +
+       I((age - mean(age))/10) + htn + ischemic_heart_disease, 
+     data = mdl1_data_complete)
+summary(mdl1)
+plot(mdl1)
+```
+
+```{r Robust Variance Estimator for Full model}
+#Run Dan211Functions First
+library(kableExtra)
+full_model_table <- lmCI(mdl1, robust = TRUE)
+rownames(full_model_table) <- 
+  c("Intercept", "Admission NIHSS", "Admission MRS", 
+    "Diff b/w Multiple locations & Cortical", 
+    "Diff b/w Subcortical & Cortical",
+    "Diff b/w Cerebellum & Cortical",
+    "Diff b/w Brainstem & Cortical",
+    "Caregiver", "Prior Stroke", "Diff b/w Black & White", 
+    "Diff b/w Other & White", "Diff b/w Male & Female",
+    "BMI", "Cholesterol", "Diabetes", 
+    "Antidepressants at Arrival", "Anxiolytic at Arrival", 
+    "Centered Age per 10 years", "Hypertension", 
+    "Ischemic Heart Disease")
+full_final_table <- kable(format_lm_output(full_model_table), file = "html",
+      caption = "Stroke Model Using All Covariates and Robust Variance Estimator")
+full_final_table
+```
+
+```{r Stepwise}
+step(mdl1)
+mdl1_step <- 
+  lm(length_of_admission_days ~ admission_nihss + admission_mrs_score + 
+       race + cholesterol_mg_d_l + I((age - mean(age))/10), 
+     data = mdl1_data_complete)
+summary(mdl1_step)
+plot(mdl1_step)
+```
