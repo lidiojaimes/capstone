@@ -27,7 +27,10 @@ mdl1_data <-
       factor(location_of_stroke,
              levels = c("Cortical","Multiple Locations",
                         "Subcortical","Cerebellum",
-                        "Unknown","Brainstem"))) |>
+                        "Brainstem"))) |>
+  filter(id_number>=375 #, #want everyone after second year of entry
+         #!is.na(location_of_stroke)
+         ) |> #want complete cases, no NAs location of stroke
   select(id_number,length_of_admission_days, admission_nihss, admission_mrs_score, 
          location_of_stroke, caregiver, prior_stroke, race, age, sex_male, 
          bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
@@ -44,15 +47,29 @@ visdat::vis_miss(mdl1_data) +
   labs(title="Missingness in stroke data")
 #this tells us that a lot of missing cases comes from statin variable, which was expected.
 
-VIM::aggr(mdl1_data[,-16],
+VIM::aggr(mdl1_data,
           col = c("blue","red"),
           numbers = TRUE,
-          labels = names(mdl1_data[,-16]),
+          labels = names(mdl1_data),
           cex.axis=.4, gap=3,
           ylab = c("Histogram of missing data", "Pattern"))
 
-mdl1_data_complete_exclStatin = 
-  mdl1_data[,-16] |> na.omit()
+# mdl1_data_complete_exclStatin = 
+#   mdl1_data[,-16] |> na.omit()
+```
+
+
+```{r MICE}
+library(mice)
+mdl1_numeric <- mdl1_data |> select_if(is.numeric)
+imputed_data <- mice(mdl1_numeric, m = 5, method = "pmm", set.seed = 123)
+summary(imputed_data)
+
+imputed_datasets <- complete(imputed_data, "all")
+imputed_df <- do.call(rbind, imputed_datasets)
+imputed_df$imputation <- rep(1:5, each = n)
+imputed_df
+mdl1_data
 ```
 
 
@@ -61,15 +78,24 @@ mdl1 <-
   lm(length_of_admission_days ~ admission_nihss + admission_mrs_score + 
        location_of_stroke + caregiver + prior_stroke + race + sex_male + 
        bmi_kg_m_2 + cholesterol_mg_d_l + dm + antidep_arrival + anxio_arrival +
-       I((age - mean(age))/10) + statin_arrival + htn, data = mdl1_data_complete)
+       I((age - mean(age))/10) + statin_arrival + htn + ischemic_heart_disease, 
+     data = mdl1_data_complete)
 summary(mdl1)
 plot(mdl1)
 ```
 
+```{r}
+step(mdl1)
+```
+
 Final model suggested is: 
-$$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS} + \beta_2\text{AdmissionMRS} + \beta_3\text{Cholesterol}+ \beta_4\text{Age/10yrs} + \epsilon$$
+$$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS} + \beta_2\text{AdmissionMRS} + \beta_3\text{Race}+ \beta_4\text{Cholesterol}+ \beta_5\text{Age/10yrs} + \epsilon$$
 
 Will potentially use a robust variance estimator. First need to see what residual plot looks like after multiple imputation via MICE package. 
+
+
+
+
 
 ```{r}
 mdl1_exclStatin <-
