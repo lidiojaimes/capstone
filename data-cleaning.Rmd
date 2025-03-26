@@ -135,8 +135,8 @@ Notes for paper: weird entry for presence of caregiver for 18, set as unknown.
 
 
 
+# IGNORE Discharge Destinations (needs work)
 
-# Discharge Destinations (needs work)
 Need to go back in and QA this variable created.
 ```{r Discharge} 
 discharge_info <- 
@@ -184,7 +184,6 @@ stroke_raw |>
 
 table(stroke$expiration)
 ```
-
 Everyone (9 patients) with a sum of two for discharge outcomes have home_health and hospice. Only one patient (119) has acute_rehabilitation and home_health.
 
 For the discharge, make a case_when to include all different levels. starts at discharge (fq) to other discharge location (ga). Expiration is if they died before discharge. Check if they have a yes and a discharge location (quality conflict)
