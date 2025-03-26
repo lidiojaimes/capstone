@@ -1,0 +1,90 @@
+---
+title: "Classification Tree"
+author: "Lidio Jaimes Jr"
+date: "2025-03-24"
+output: pdf_document
+---
+# Discharge Destinations
+
+```{r}
+stroke[, c(172,174:177,179:182)] <- lapply(stroke[, c(172,174:177,179:182)], as.numeric)
+
+#this gives us full counts
+stroke |> 
+  filter(!id_number %in% c(18, 20, 28, 66, 75, 119, 
+                           393, 405, 410)) |>  #have 2 discharge locations
+  select(expiration,acute_rehabilitation,subacute_rehabilitation,
+         inpatient_rehabilitation,assited_living_facility,home_health,
+         home_with_no_needs,hospice,other_discharge_location) |> 
+  summarise(across(everything(),~ sum(.x, na.rm = TRUE)))
+
+ppl_with2_discharge <- 
+  stroke |> 
+  select(id_number,expiration,acute_rehabilitation,subacute_rehabilitation,
+         inpatient_rehabilitation,assited_living_facility,home_health,
+         home_with_no_needs,hospice,other_discharge_location) |> 
+  rowwise() |> 
+  mutate(row_sum = sum(c_across(-1), na.rm = TRUE)) |> 
+  ungroup() |> 
+  filter(row_sum==2)
+
+data_mdl2 <-
+  stroke |> 
+  filter(!id_number%in%ppl_with2_discharge$id_number) |> #these are patients with more than two categories
+  mutate(
+    discharge_location = case_when(
+      expiration == 1 ~ "Expiration",
+      home_with_no_needs == 1 ~ "Home with no needs",
+      home_health == 1 | assited_living_facility == 1 ~ "Home health or assisted living",
+      subacute_rehabilitation == 1 ~ "Subacute rehabilitation",
+      inpatient_rehabilitation == 1 | acute_rehabilitation == 1 ~ "Inpatient or acute rehabilitation",
+      hospice == 1 ~ "Hospice",
+      other_discharge_location == 1 ~ "Other discharge location"),
+    discharge_location = as.factor(discharge_location),
+    caregiver = case_when(
+      caregiver == "Present" ~ 1,
+      caregiver == "Absent" ~ 0),
+    prior_stroke = case_when(
+      prior_stroke == "No" ~ 0,
+      prior_stroke == "Yes" ~ 1),
+    sex_male = ifelse(sex == "Male", 1, 0),
+    dm = ifelse(dm == "No", 0, 1),
+    id_number = as.numeric(id_number),
+    location_of_stroke = 
+      factor(location_of_stroke,
+             levels = c("Cortical","Multiple Locations",
+                        "Subcortical","Cerebellum",
+                        "Brainstem"))) |> 
+  filter(id_number>=375) |> #want everyone after second year of entry
+  select(length_of_admission_days, admission_nihss, admission_mrs_score, 
+         location_of_stroke, caregiver, prior_stroke, race, age, sex_male, 
+         bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
+         statin_arrival, htn, ischemic_heart_disease,discharge_location) |> # 178 cases
+  drop_na() # 75 cases
+```
+
+```{r}
+set.seed(5010)
+trainSet <- sample.int(nrow(data_mdl2),size=0.8*nrow(data_mdl2))
+mdl2.train <- data_mdl2[trainSet,]
+mdl2.test <- data_mdl2[-trainSet,]
+
+#tree
+library(tree)
+mdl2_tree1 <- tree(discharge_location ~ .,data=mdl2.train)
+plot(mdl2_tree1, col = "deeppink3", type = "uniform")
+text(mdl2_tree1, col = "royalblue3", pretty = 0, cex = .8)
+
+# Confusion Matrix for Tree
+library(DescTools) 
+
+mdl2.test$pred <- 
+  predict(mdl2_tree1, newdata = mdl2.test, type = "class")
+with(mdl2.test, Conf(pred, discharge_location, pos = "Yes"))
+```
+
+lesion location variable: have a group that has any cortical involvement and add to cortical group
+
+including cortex: cortical 
+side of lesion: right and left
+
