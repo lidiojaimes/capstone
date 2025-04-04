@@ -31,7 +31,7 @@ stroke <-
   stroke |> 
   filter(!id_number%in%c(211, 391, 528, 529, 536, 537, 555, 558, 576, 582),
          !id_number%in%c(316,322),
-         ischemic == 1) 
+         ischemic == 1)
 ```
 
 For notes: Patient 100 has a good bit of missing. Patient 469 was transferred to different hospital. Neither removed yet. Patient 532 has 43 days of admission, but not removed yet.
@@ -58,6 +58,7 @@ stroke <-
                                      labels = c("Brainstem","Cerebellum",
                                                 "Cortical","Subcortical",
                                                 "Multiple Locations")),
+         lesion_cortical=ifelse(cortical_stroke_location==1,1,0), #cortical location indictor
          race = ifelse(race=="Other","Other","White"),
          race = case_when(
            race == "White" ~ "White",
@@ -115,7 +116,16 @@ stroke <-
          pt_am_pac_score = as.numeric(pt_am_pac_score),
          discharge_nihss = as.numeric(discharge_nihss),
          discharge_mrs_score = as.numeric(discharge_mrs_score),
-         ot_am_pac_score = as.numeric(ot_am_pac_score))
+         ot_am_pac_score = as.numeric(ot_am_pac_score),
+         log_lengthhospitalstay = log(length_of_admission_days),
+         side_of_stroke = case_when(
+           side_of_stroke == 1 ~ "Right",
+           side_of_stroke == 2 ~ "Left",
+           side_of_stroke == 3 ~ "Bilateral",
+           TRUE ~ NA),
+         side_of_stroke = 
+           factor(side_of_stroke,
+                  levels = c("Right","Left","Bilateral")))
 
 stroke[stroke$id_number==532,"race"] = "Other"
 stroke[stroke$id_number==223,"race"] = "Other"
@@ -125,67 +135,6 @@ Patients with Race classified as other are either: Other(Native American and Nat
 
 Notes for paper: weird entry for presence of caregiver for 18, set as unknown.
 
-**medication** use (anticoagulants, statins, antidepressants, anxiolytics): Medication data at arrival only available from patients 375 and onward (some still missing after). What is the reason? What is the purpose of medication list at arrival notes? Is list one just generic and notes the specific medication? Made antidepressant and anxiolytic an indicator variable for wheter or not taking before stroke. There is no variable for anticoagulants?
+**medication** use (anticoagulants, statins, antidepressants, anxiolytics): Medication data at arrival only available from patients 375 and onward (some still missing after). 
 
 
-
-
-
-
-
-
-
-# IGNORE Discharge Destinations (needs work)
-
-Need to go back in and QA this variable created.
-```{r Discharge} 
-discharge_info <- 
-  stroke |> 
-  select(id_number,expiration,acute_rehabilitation,subacute_rehabilitation,
-         inpatient_rehabilitation,assited_living_facility,home_health,
-         home_with_no_needs,hospice,other_discharge_location) |> 
-  sapply(as.numeric) |> 
-  as.data.frame()
-
-discharge_info |> 
-  mutate(sum_discharge=apply(discharge_info[3:9],1,sum)) |> 
-  filter(sum_discharge==2)
-
-
-stroke[, c(172,174:177,179:182)] <- lapply(stroke[, c(172,174:177,179:182)], as.numeric)
-
-test<-
-  stroke |> 
-  mutate(multiple_discharge = 
-           ifelse(rowSums(stroke[,c(172,174:177,179:182)], na.rm = TRUE) > 1, 1, 0),
-         discharge_info = 
-           case_when(
-             multiple_discharge==0 & expiration == 1 ~ "Expiration",
-             multiple_discharge==0 & acute_rehabilitation == 1 ~ "Acute rehabilitation",
-             multiple_discharge==0 & subacute_rehabilitation == 1 ~ "Subacute rehabilitation",
-             multiple_discharge==0 & inpatient_rehabilitation == 1 ~ "Inpatient rehabilitation",
-             multiple_discharge==0 & assited_living_facility == 1 ~ "Assited living facility", #maybe assisted
-             multiple_discharge==0 & home_health == 1 ~ "Home health",
-             multiple_discharge==0 & home_with_no_needs == 1 ~ "Home with no needs",
-             multiple_discharge==0 & hospice == 1 ~ "Hospice",
-             multiple_discharge==0 & other_discharge_location == 1 ~ "Other discharge location",
-             multiple_discharge==1 ~ "Multiple discharge",
-             TRUE ~ "Unknown"),
-         discharge_info = factor(discharge_info,
-                                 levels = c("Expiration","Acute rehabilitation",
-                                            "Subacute rehabilitation","Inpatient rehabilitation",
-                                            "Assited living facility","Home health","Home with no needs",
-                                            "Hospice","Other discharge location","Multiple discharge",
-                                            "Unknown")))
-
-table(test$discharge_info,useNA = "ifany")
-stroke_raw |> 
-  group_by(other_discharge_location) |> summarise(n())
-
-table(stroke$expiration)
-```
-Everyone (9 patients) with a sum of two for discharge outcomes have home_health and hospice. Only one patient (119) has acute_rehabilitation and home_health.
-
-For the discharge, make a case_when to include all different levels. starts at discharge (fq) to other discharge location (ga). Expiration is if they died before discharge. Check if they have a yes and a discharge location (quality conflict)
-
-can also look at these variables: look at insulin as well, medication notes, last known well time (LKWT)
