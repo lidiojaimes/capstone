@@ -642,14 +642,14 @@ stroke[stroke$id_number==223,"race"] = "Other"
 
 A predictive model in acute stroke patient's care incorporating pre-existing conditions (diabetes, hypertension, CAD, ischemic heart disease), lifestyle factors (smoking, obesity, hypercholesterolemia), socioeconomic, demographic factors, presence of caregiver and medication use (anticoagulants, statins, antidepressants, anxiolytics) will estimate patients' length of hospital stay at initial assessment.
 
-$$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{StrokeLocation-MultipleLocations}_i + \\ \beta_4\text{StrokeLocation-Subcortical}_i +  \beta_5\text{StrokeLocation-Cerebellum}_i + \beta_6\text{StrokeLocation-Brainstem}_i + \\ \beta_7\text{CaregiverPresence}_i + \beta_8\text{PriorStroke}_i + \beta_9\text{Race-Black}_i + \beta_{10}\text{Race-Other}_i + \beta_{11}\text{Age}_i + \\ \beta_{12}\text{Sex}_i + \beta_{13}\text{BMI}_i + \beta_{14}\text{Cholesterol}_i + \beta_{15}\text{Diabetes} + \beta_{16}\text{Statins}_i + \beta_{17}\text{Antidepressants}_i + \\ \beta_{18}\text{Anxiolytics}_i+  \beta_{19}\text{Hypertension} + \beta_{20}\text{IschemicHeartDisease} + \epsilon_i$$
+$$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{StrokeLocation-MultipleLocations}_i + \\ \beta_4\text{StrokeLocation-Subcortical}_i +  \beta_5\text{StrokeLocation-Cerebellum}_i + \beta_6\text{StrokeLocation-Brainstem}_i + \\ \beta_7\text{CaregiverPresence}_i + \beta_8\text{PriorStroke}_i + \beta_9\text{Race-Black}_i + \beta_{10}\text{Race-Other}_i + \beta_{11}\text{Age}_i + \\ \beta_{12}\text{Sex}_i + \beta_{13}\text{BMI}_i + \beta_{14}\text{Cholesterol}_i + \beta_{15}\text{Diabetes} + \beta_{16}\text{Statins}_i + \beta_{17}\text{Antidepressants}_i + \\ \beta_{18}\text{Anxiolytics}_i + \beta_{19}\text{Hypertension} + \beta_{20}\text{IschemicHeartDisease} + \beta_{21}\text{SmokingHistory} + \epsilon_i$$
 
 Shorter version:
 $$E[\text{length of admission days}] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \overrightarrow{\boldsymbol{\gamma}}^T\overrightarrow{\boldsymbol{z}_i}$$
 
-### *Add CAD and smoking history*
+What is the variable for CAD?
 
-# Model 1 after second year of data entry
+# Model 1 after second year of data entry (want to see meds at arrival)
 
 ```{r Subsetting complete}
 mdl1_data <- 
@@ -675,44 +675,6 @@ mdl1_data <-
          bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
          statin_arrival, htn, ischemic_heart_disease)
 ```
-
-```{r Completeness}
-mdl1_data_complete = mdl1_data[complete.cases(mdl1_data),]
-
-visdat::vis_miss(mdl1_data) +
-  labs(title="Missingness in stroke data")
-#this tells us that a lot of missing cases comes from statin variable, which was expected.
-
-VIM::aggr(mdl1_data,
-          col = c("blue","red"),
-          numbers = TRUE,
-          labels = names(mdl1_data),
-          cex.axis=.4, gap=3,
-          ylab = c("Histogram of missing data", "Pattern"))
-
-# mdl1_data_complete_exclStatin = 
-#   mdl1_data[,-16] |> na.omit()
-```
-
-
-```{r MICE}
-# library(mice)
-# mdl1_numeric <- mdl1_data |> select_if(is.numeric)
-# imputed_data <- mice(mdl1_numeric, m = 5, method = "pmm", set.seed = 123)
-# summary(imputed_data)
-# 
-# imputed_datasets <- complete(imputed_data, "all")
-# imputed_df <- do.call(rbind, imputed_datasets)
-# imputed_df$imputation <- rep(1:5, each = n)
-# imputed_df
-# mdl1_data
-# 
-# imputed_data <-
-#   mdl1_data |> 
-#   select_if(is.numeric) |> 
-#   mice(method = "norm.nob", m = 5, print = FALSE, seed = 5010)
-```
-
 
 ```{r Full model base}
 mdl1 <-
@@ -789,7 +751,7 @@ summary(mdl1_interactions)
 plot(mdl1_interactions)
 ```
 
-# Ignoring statin medication at arrival
+# Ignoring meds at arrival
 
 $$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{StrokeLocation-MultipleLocations}_i + \\ \beta_4\text{StrokeLocation-Subcortical}_i +  \beta_5\text{StrokeLocation-Cerebellum}_i + \beta_6\text{StrokeLocation-Brainstem}_i + \\ \beta_7\text{CaregiverPresence}_i + \beta_8\text{PriorStroke}_i + \beta_9\text{Race-Black}_i + \beta_{10}\text{Race-Other}_i + \beta_{11}\text{Age}_i + \\ \beta_{12}\text{Sex}_i + \beta_{13}\text{BMI}_i + \beta_{14}\text{Cholesterol}_i + \beta_{15}\text{Diabetes} + \beta_{16}\text{Antidepressants}_i + \\ \beta_{17}\text{Anxiolytics}_i+  \beta_{18}\text{Hypertension} + \beta_{19}\text{IschemicHeartDisease} + \epsilon_i$$
 
@@ -878,3 +840,60 @@ step_final_table
 
 Final model suggested is: 
 $$\text{Length of admission days} = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \\ \beta_3\text{Race-Black}_i + \beta_4\text{Race-Other}_i + \beta_5\text{Cholesterol}_i+ \beta_6\text{Age}_i + \epsilon_i$$
+# New model 4/4/25
+
+In this model we're using the new cortical indicator variable, side of stroke, and log of admission days as the response
+
+
+
+```{r Potential final model}
+mdl1_data <- 
+  stroke |> 
+  mutate(
+    caregiver = case_when(
+      caregiver == "Present" ~ 1,
+      caregiver == "Absent" ~ 0),
+    prior_stroke = case_when(
+      prior_stroke == "No" ~ 0,
+      prior_stroke == "Yes" ~ 1),
+    sex_male = ifelse(sex == "Male", 1, 0),
+    dm = ifelse(dm == "No", 0, 1),
+    id_number = as.numeric(id_number),
+    location_of_stroke = 
+      factor(location_of_stroke,
+             levels = c("Cortical","Multiple Locations",
+                        "Subcortical","Cerebellum",
+                        "Brainstem"))) |> 
+  select(id_number, admission_nihss, admission_mrs_score, 
+         location_of_stroke, caregiver, prior_stroke, race, age, sex_male, 
+         bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
+         htn, ischemic_heart_disease, cigarette_smoking, lesion_cortical, 
+         length_of_admission_days, log_lengthhospitalstay, side_of_stroke)
+
+mdl1_data_complete <-
+  mdl1_data[complete.cases(mdl1_data),] |> 
+  filter(length_of_admission_days!=0)
+```
+$$\ln[\text{Length of admission days}] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke}_i + \\ \beta_4\text{Cortical Lesion}_i +  \beta_5\text{Caregiver Presence}_i + \beta_6\text{Prior Stroke}_i +  \beta_7\text{Race-Black}_i + \\\beta_{8}\text{Race-Other}_i + \beta_{9}\text{Age}_i + \beta_{10}\text{Sex-Male}_i + \beta_{11}\text{BMI}_i + \beta_{12}\text{Cholesterol}_i + \\ \beta_{13}\text{Diabetes} + \beta_{14}\text{Antidepressants}_i + \beta_{15}\text{Anxiolytics}_i + \beta_{16}\text{Hypertension} + \\ \beta_{17}\text{IschemicHeartDisease} + \beta_{18}\text{SmokingHistory} + \epsilon_i$$
+
+```{r potential full model excluding statin}
+mdl1 <-
+  lm(log_lengthhospitalstay ~ admission_nihss + admission_mrs_score + side_of_stroke + 
+       lesion_cortical + caregiver + prior_stroke + race + sex_male + 
+       bmi_kg_m_2 + cholesterol_mg_d_l + dm + antidep_arrival + anxio_arrival +
+       I((age - mean(age))/10) + htn + ischemic_heart_disease + cigarette_smoking #+ prior_stroke:I((age - mean(age))/10) + htn:prior_stroke + ischemic_heart_disease:prior_stroke
+     , 
+     data = mdl1_data_complete)
+summary(mdl1)
+plot(mdl1)
+```
+
+```{r Stepwise ignoring statin}
+step(mdl1)
+mdl1_step <- 
+  lm(log_lengthhospitalstay ~ admission_nihss + admission_mrs_score + 
+       cholesterol_mg_d_l + anxio_arrival + I((age - mean(age))/10) + htn, 
+     data = mdl1_data_complete)
+summary(mdl1_step)
+plot(mdl1_step)
+```
