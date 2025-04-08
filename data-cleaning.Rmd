@@ -4,6 +4,7 @@ author: "Lidio Jaimes Jr"
 date: "2025-03-10"
 output: pdf_document
 ---
+# Reading in the data
 ```{r Importing libraries}
 library(tidyverse)
 library(forcats)
@@ -38,6 +39,8 @@ For notes: Patient 100 has a good bit of missing. Patient 469 was transferred to
 
 For paper: Patients 316 (105 days) and 322 (79 days) were removed from analyses. Their length of admission days being so large is likely due to different factors. Patients 211, 528, 529, 536, 537, 555, 558, 576, 582 were all/majority blank and removed from analyses. Patient 391 had repeat MRN and one observation was removed from analyses. Focus on ischemic, so everyone with different type of stroke was removed. Patient 361 has a decimal for length of admission days, was rounded up to 16. 
 
+# Data Wrangling
+
 ```{r Data Wrangling}
 stroke$brainstem_stroke_lcation <- as.numeric(stroke$brainstem_stroke_lcation)
 
@@ -65,6 +68,7 @@ stroke <-
            str_detect(patient_identification_notes, "African") ~ "Black",
            TRUE ~ "Other"),
          race = factor(race, levels = c("White", "Black", "Other")),
+         age = ifelse(is.na(age),estimated_age,age),
          age = as.numeric(age),
          admission_nihss = as.numeric(admission_nihss),
          cholesterol_mg_d_l = as.numeric(cholesterol_mg_d_l),
@@ -137,4 +141,147 @@ Notes for paper: weird entry for presence of caregiver for 18, set as unknown.
 
 **medication** use (anticoagulants, statins, antidepressants, anxiolytics): Medication data at arrival only available from patients 375 and onward (some still missing after). 
 
+# New data
+
+```{r}
+library(readxl)
+newstroke_raw <- 
+  readxl::read_xlsx("Lesion Location (Artery) 2025 no id.xlsx", 
+                    sheet = "main - for importing",
+                    # range = cell_cols(c("A:C","E:F","CI","CP:CQ","DX:EJ","EN")),
+                    range = cell_cols("A:W"),
+                    na = c("", " ", "UNK", "Unk", "NA", "na", "Na", 9999, "????"),
+                    skip = 1, 
+                    col_names = TRUE)
+names(newstroke_raw) <- newstroke_raw[1,] 
+newstroke_raw <- newstroke_raw[-c(1:2),] |> janitor::clean_names()
+newstroke_raw$date_of_stroke = openxlsx::convertToDate(newstroke_raw$date_of_stroke)
+newstroke_raw$discharge_date = openxlsx::convertToDate(newstroke_raw$discharge_date)
+newstroke_raw$expiration_date = openxlsx::convertToDate(newstroke_raw$expiration_date)
+
+newstroke_raw
+```
+
+# Multiple Imputation
+this data set excludes statin
+```{r}
+mdl1_data <- 
+  stroke |> 
+  mutate(
+    caregiver = case_when(
+      caregiver == "Present" ~ 1,
+      caregiver == "Absent" ~ 0),
+    prior_stroke = case_when(
+      prior_stroke == "No" ~ 0,
+      prior_stroke == "Yes" ~ 1),
+    sex_male = ifelse(sex == "Male", 1, 0),
+    dm = ifelse(dm == "No", 0, 1),
+    id_number = as.numeric(id_number),
+    location_of_stroke = 
+      factor(location_of_stroke,
+             levels = c("Cortical","Multiple Locations",
+                        "Subcortical","Cerebellum",
+                        "Brainstem"))) |> 
+  filter(length_of_admission_days!=0) |> #log gives us -Inf
+  select(id_number, admission_nihss, admission_mrs_score, # location_of_stroke,
+         caregiver, prior_stroke, race, age, sex_male, 
+         bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
+         htn, ischemic_heart_disease, cigarette_smoking, lesion_cortical, 
+         length_of_admission_days, log_lengthhospitalstay, side_of_stroke)
+
+mdl1_data$caregiver <- factor(mdl1_data$caregiver)
+mdl1_data$prior_stroke <- factor(mdl1_data$prior_stroke)
+mdl1_data$antidep_arrival <- factor(mdl1_data$antidep_arrival)
+mdl1_data$anxio_arrival <- factor(mdl1_data$anxio_arrival)
+mdl1_data$lesion_cortical <- factor(mdl1_data$lesion_cortical)
+mdl1_data$sex_male <- factor(mdl1_data$sex_male)
+mdl1_data$dm <- factor(mdl1_data$dm)
+mdl1_data$htn <- factor(mdl1_data$htn)
+mdl1_data$ischemic_heart_disease <- factor(mdl1_data$ischemic_heart_disease)
+
+mdl1_data_complete <-
+  mdl1_data[complete.cases(mdl1_data),]
+```
+
+```{r Completeness}
+visdat::vis_miss(select_if(mdl1_data,~ any(is.na(.)))) +
+  labs(title="Missingness in stroke data")
+
+VIM::aggr(mdl1_data,
+          col = c("blue","red"),
+          numbers = TRUE,
+          labels = names(mdl1_data),
+          cex.axis=.4, gap=3,
+          ylab = c("Histogram of missing data", "Pattern"))
+```
+
+```{r MCAR vs MAR}
+library(naniar)
+mcar_test(mdl1_data[mdl1_data$length_of_admission_days!=0,]) #NOT MCAR
+miss_var_summary(mdl1_data)
+```
+
+Assuming the data is MAR
+
+```{r checking normality, eval=FALSE}
+mdl1_data_numeric <- mdl1_data |> select(-1) |> select_if(is.numeric)
+for (col in colnames(mdl1_data_numeric)) {
+  hist(mdl1_data_numeric[[col]], main = paste(col))
+}
+```
+
+Only age, bmi, cholesterol, and log length hospital stay can be argued for being normally distributed
+
+```{r checking for multicollinearity}
+cor(sample(na.omit(mdl1_data$bmi_kg_m_2),200),
+    sample(na.omit(mdl1_data$cholesterol_mg_d_l),200))
+
+cor(sample(na.omit(mdl1_data$admission_mrs_score),250),
+    sample(na.omit(mdl1_data$admission_nihss),250))
+
+mdl1_data |> 
+  select_if(is.numeric) |> 
+  na.omit() |> # 271 patients
+  cor() |> 
+  corrplot::corrplot.mixed()
+```
+
+```{r MICE}
+mdl1_data_imp <- mdl1_data 
+imp <- mice(mdl1_data_imp, maxit=0)
+predM <- imp$predictorMatrix
+meth <- imp$method
+
+predM[, c("id_number")] <- 0
+predM[, c("length_of_admission_days")] <- 0
+predM[, c("log_lengthhospitalstay")] <- 0
+
+imp2 <- mice(mdl1_data_imp, maxit = 5, 
+             predictorMatrix = predM, 
+             method = meth, print =  FALSE)
+
+head(imp2$imp$admission_nihss) # a lot of variability in imputed values for nihss
+tail(imp2$imp$admission_nihss)
+
+imp_long <- mice::complete(imp2, action="long", include = TRUE)
+```
+
+
+```{r MICE}
+library(mice)
+mdl1_numeric <- mdl1_data |> select_if(is.numeric)
+imputed_data <- mice(mdl1_numeric, m = 5, method = "pmm", set.seed = 123)
+summary(imputed_data)
+
+imputed_datasets <- complete(imputed_data, "all")
+imputed_df <- do.call(rbind, imputed_datasets)
+imputed_df$imputation <- rep(1:5, each = n)
+imputed_df
+mdl1_data
+
+imputed_data <-
+  mdl1_data |>
+  select_if(is.numeric) |>
+  mice(method = "norm.nob", m = 5, print = FALSE, seed = 5010)
+```
 
