@@ -54,12 +54,15 @@ data_mdl2 <-
       factor(location_of_stroke,
              levels = c("Cortical","Multiple Locations",
                         "Subcortical","Cerebellum",
-                        "Brainstem"))) |> 
-  filter(id_number>=375) |> #want everyone after second year of entry
+                        "Brainstem")),
+    antidep_discharge = ifelse(antidepressant_use == 2 | antidepressant_use == 3, 1, 0),
+    anxio_discharge = ifelse(anxiolytic_use == 2 | anxiolytic_use == 3, 1, 0),
+    statin_discharge = 
+           ifelse(str_detect(str_to_lower(medication_list_at_discharge), "statin"), 1, 0)) |> 
   select(length_of_admission_days, admission_nihss, admission_mrs_score, 
          location_of_stroke, caregiver, prior_stroke, race, age, sex_male, 
-         bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
-         statin_arrival, htn, ischemic_heart_disease,discharge_location) |> # 178 cases
+         bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_discharge, anxio_discharge, 
+         statin_discharge, htn, ischemic_heart_disease,discharge_location) |> # 178 cases
   drop_na() # 75 cases
 ```
 
@@ -73,7 +76,7 @@ mdl2.test <- data_mdl2[-trainSet,]
 library(tree)
 mdl2_tree1 <- tree(discharge_location ~ .,data=mdl2.train)
 plot(mdl2_tree1, col = "deeppink3", type = "uniform")
-text(mdl2_tree1, col = "royalblue3", pretty = 0, cex = .8)
+text(mdl2_tree1, col = "royalblue3", pretty = 0)
 
 # Confusion Matrix for Tree
 library(DescTools) 
@@ -82,6 +85,27 @@ mdl2.test$pred <-
   predict(mdl2_tree1, newdata = mdl2.test, type = "class")
 with(mdl2.test, Conf(pred, discharge_location, pos = "Yes"))
 ```
+
+```{r}
+# Prune the tree!
+set.seed(5010)
+# Use k-fold CV to compare SSE for different choices of alpha:
+cv.mdl2tree1 <- cv.tree(mdl2_tree1) # default is 10-fold CV
+plot(cv.mdl2tree1$dev~cv.mdl2tree1$size,type="b",lwd=2,pch=19,col="darkorchid",
+     main="10-fold CV results for MLBtree1\nTotal external deviance vs # of leaves",
+     xlab="# of leaves",ylab="Total deviance (SSE) across all folds")
+
+prune.mdl2tree1 <- prune.tree(mdl2_tree1,best=7)
+plot(prune.mdl2tree1,col="firebrick")
+text(prune.mdl2tree1,col="royalblue3",cex=.5)
+
+mdl2.test$predprune <- 
+  predict(prune.mdl2tree1, newdata = mdl2.test, type = "class")
+with(mdl2.test, Conf(predprune, discharge_location, pos = "Yes"))
+
+table(data_mdl2$discharge_location)
+```
+
 
 lesion location variable: have a group that has any cortical involvement and add to cortical group
 
