@@ -1,0 +1,173 @@
+---
+title: "Final Regression Analysis"
+author: "Lidio Jaimes Jr"
+date: "2025-04-13"
+output: pdf_document
+---
+# Multiple Imputation
+This data set will exclude **statin at arrival**. If we want to include it, then look after second year of data entry.
+
+## Importing the data
+```{r}
+mdl1_data <- 
+  stroke |> 
+  mutate(
+    caregiver = case_when(
+      caregiver == "Present" ~ 1,
+      caregiver == "Absent" ~ 0),
+    prior_stroke = case_when(
+      prior_stroke == "No" ~ 0,
+      prior_stroke == "Yes" ~ 1),
+    sex_male = ifelse(sex == "Male", 1, 0),
+    dm = ifelse(dm == "No", 0, 1),
+    id_number = as.numeric(id_number),
+    location_of_stroke = 
+      factor(location_of_stroke,
+             levels = c("Cortical","Multiple Locations",
+                        "Subcortical","Cerebellum",
+                        "Brainstem"))) |> 
+  filter(length_of_admission_days!=0) |> #log gives us -Inf
+  select(id_number, admission_nihss, admission_mrs_score,
+         caregiver, prior_stroke, race, age, sex_male, 
+         bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
+         htn, ischemic_heart_disease, cigarette_smoking, lesion_cortical, 
+         length_of_admission_days, side_of_stroke#, location_of_stroke,
+         )
+
+mdl1_data$caregiver <- factor(mdl1_data$caregiver)
+mdl1_data$prior_stroke <- factor(mdl1_data$prior_stroke)
+mdl1_data$antidep_arrival <- factor(mdl1_data$antidep_arrival)
+mdl1_data$anxio_arrival <- factor(mdl1_data$anxio_arrival)
+mdl1_data$lesion_cortical <- factor(mdl1_data$lesion_cortical)
+mdl1_data$sex_male <- factor(mdl1_data$sex_male)
+mdl1_data$dm <- factor(mdl1_data$dm)
+mdl1_data$htn <- factor(mdl1_data$htn)
+mdl1_data$ischemic_heart_disease <- factor(mdl1_data$ischemic_heart_disease)
+
+mdl1_data_complete <-
+  mdl1_data[complete.cases(mdl1_data),]
+```
+
+```{r Completeness}
+visdat::vis_miss(select_if(mdl1_data,~ any(is.na(.)))) +
+  labs(title="Missingness in stroke data")
+
+VIM::aggr(mdl1_data,
+          col = c("blue","red"),
+          numbers = TRUE,
+          labels = names(mdl1_data),
+          cex.axis=.4, gap=3,
+          ylab = c("Histogram of missing data", "Pattern"))
+```
+
+## Looking at missingness
+```{r MCAR vs MAR}
+library(naniar)
+mcar_test(mdl1_data[mdl1_data$length_of_admission_days!=0,]) #NOT MCAR
+miss_var_summary(mdl1_data)
+
+stroke |> 
+  filter(is.na(admission_nihss)|is.na(caregiver)|is.na(admission_mrs_score),
+         id_number%in%mdl1_data$id_number) |> 
+  select(id_number,admission_nihss,admission_mrs_score, #caregiver,
+         date_of_stroke,discharge_date)
+```
+
+Assuming the data is MAR. What drives the missingness for admission scores?
+
+## Checking normality
+```{r checking normality, eval=FALSE}
+mdl1_data_numeric <- mdl1_data |> select(-1) |> select_if(is.numeric)
+for (col in colnames(mdl1_data_numeric)) {
+  hist(mdl1_data_numeric[[col]], main = paste(col))
+}
+```
+
+Only age, bmi, cholesterol, and log length hospital stay can be argued for being normally distributed
+
+## Checking multicollinearity
+```{r checking for multicollinearity}
+# cor(sample(na.omit(mdl1_data$bmi_kg_m_2),200),
+#     sample(na.omit(mdl1_data$cholesterol_mg_d_l),200))
+# 
+# cor(sample(na.omit(mdl1_data$admission_mrs_score),250),
+#     sample(na.omit(mdl1_data$admission_nihss),250))
+
+mdl1_data |> 
+  select_if(is.numeric) |> 
+  na.omit() |> # 271 patients
+  cor() |> 
+  corrplot::corrplot.mixed()
+```
+
+## Running MICE
+```{r MICE}
+mdl1_data_imp <- mdl1_data 
+imp <- mice(mdl1_data_imp, maxit=0)
+predM <- imp$predictorMatrix
+meth <- imp$method
+
+predM[, c("id_number")] <- 0
+predM[, c("length_of_admission_days")] <- 0
+
+imp2 <- mice(mdl1_data_imp, m = 100, 
+             predictorMatrix = predM, 
+             method = meth, print =  FALSE)
+
+# head(imp2$imp$admission_nihss) # a lot of variability in imputed values for nihss
+# tail(imp2$imp$admission_nihss)
+
+imp_long <- mice::complete(imp2, action="long", include = TRUE)
+#confused on why some changed to numeric and log
+imp_long_mids<-as.mids(imp_long)
+fitimp <- with(imp_long_mids,
+               lm(log(length_of_admission_days) ~ admission_nihss + admission_mrs_score + 
+                    side_of_stroke + lesion_cortical + caregiver + prior_stroke + 
+                    race + sex_male + bmi_kg_m_2 + cholesterol_mg_d_l + dm + 
+                    antidep_arrival + anxio_arrival + age + 
+                    htn + ischemic_heart_disease + cigarette_smoking))
+```
+
+## MICE output
+```{r}
+res <- pool(fitimp)
+summary(res)
+# round(summary(res), 3)
+pool.r.squared(fitimp) 
+glance(res)
+#visreg making sense of regression
+#make lob length of stay in the model, visreg can do length of admission days back to og scale
+#make age normal
+#gtsummary::tbl_regression(myModel)
+```
+
+# need to run stepwise
+```{r}
+set.seed(5010)
+selected_vars <- list()
+for (i in 1:100) { # Run stepwise on each imputed dataset
+  data_i <- complete(imp2, i)
+  
+  full_model <- lm(log(length_of_admission_days) ~ 
+                     admission_nihss + admission_mrs_score + side_of_stroke + 
+                     lesion_cortical + caregiver + prior_stroke + race + 
+                     sex_male + bmi_kg_m_2 + cholesterol_mg_d_l + dm +
+                     antidep_arrival + anxio_arrival + age + htn + 
+                     ischemic_heart_disease + cigarette_smoking,
+                   data = data_i)
+  step_model <- step(full_model, direction = "both", trace = FALSE)
+  selected_vars[[i]] <- names(coef(step_model))
+}
+
+sort(table(unlist(selected_vars)), decreasing = TRUE) #frequency of selected variables
+
+fit_final <- with(imp2, # fitting model on each imputed dataset and pool
+                  lm(log(length_of_admission_days) ~ 
+                       admission_mrs_score + admission_nihss + age + 
+                       side_of_stroke + bmi_kg_m_2 + htn + cholesterol_mg_d_l))
+res_final <- pool(fit_final)
+summary_final <- summary(res_final)
+summary_final$exp_estimate <- exp(summary_final$estimate)
+summary_final
+glance(res_final)
+```
