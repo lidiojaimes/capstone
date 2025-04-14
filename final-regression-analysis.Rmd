@@ -251,6 +251,7 @@ meth <- imp$method
 
 predM[, c("length_of_admission_days")] <- 0
 
+set.seed(5010) 
 imp2 <- mice(mdl1_data_imp, m = 100, 
              predictorMatrix = predM, 
              method = meth, print =  FALSE)
