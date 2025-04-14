@@ -131,10 +131,21 @@ stroke <-
            TRUE ~ NA),
          side_of_stroke = 
            factor(side_of_stroke,
-                  levels = c("Right","Left","Bilateral")))
+                  levels = c("Right","Left","Bilateral")),
+         admission_unit = case_when( #there are ppl with two admission units
+           admission_unit == "1" ~ "ICU",
+           admission_unit == "2" ~ "Stroke Unit",
+           admission_unit == "3" ~ "Observation Unit",
+           admission_unit == "4" ~ "Admission transfer from ED",
+           admission_unit == "5" ~ "Other",
+           TRUE ~ NA),
+         admission_unit = factor(admission_unit,
+                                 levels = c("ICU", "Stroke Unit", "Observation Unit",
+                                            "Admission transfer from ED", "Other")))
 
 stroke[stroke$id_number==532,"race"] = "Other"
 stroke[stroke$id_number==223,"race"] = "Other"
+stroke[, c(172,174:177,179:182)] <- lapply(stroke[, c(172,174:177,179:182)], as.numeric)
 ```
 
 Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532 and 223). No one has a stroke_location of other, people with missing data were grouped here. Some of the people with no stroke_location, have under the notes column that it is possible TIA, should these people be excluded from analysis?
