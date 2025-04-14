@@ -7,8 +7,6 @@ output: pdf_document
 # Discharge Destinations
 
 ```{r}
-stroke[, c(172,174:177,179:182)] <- lapply(stroke[, c(172,174:177,179:182)], as.numeric)
-
 #this gives us full counts
 stroke |> 
   filter(!id_number %in% c(18, 20, 28, 66, 75, 119, 
@@ -41,6 +39,28 @@ data_mdl2 <-
       hospice == 1 ~ "Hospice",
       other_discharge_location == 1 ~ "Other discharge location"),
     discharge_location = as.factor(discharge_location),
+    
+    #for tree purposes, comment out when not needed
+    
+    discharge_location = factor(discharge_location,
+                                   levels = c("Expiration", "Home with no needs",
+                                              "Home health or assisted living",
+                                              "Subacute rehabilitation",
+                                              "Inpatient or acute rehabilitation",
+                                              "Hospice", "Other discharge location"),
+                                   labels = c("Expiration","Home NN",
+                                              "HH/AL","Subacute",
+                                              "IP/AC", "Hospice",
+                                              "Other")),
+    admission_unit = factor(admission_unit,
+                                   levels = c("ICU", "Stroke Unit",
+                                              "Observation Unit",
+                                              "Admission transfer from ED",
+                                              "Other"),
+                                   labels = c("ICU","Stroke",
+                                              "Obs","frm ED",
+                                              "Other")),
+    
     caregiver = case_when(
       caregiver == "Present" ~ 1,
       caregiver == "Absent" ~ 0),
@@ -59,11 +79,24 @@ data_mdl2 <-
     anxio_discharge = ifelse(anxiolytic_use == 2 | anxiolytic_use == 3, 1, 0),
     statin_discharge = 
            ifelse(str_detect(str_to_lower(medication_list_at_discharge), "statin"), 1, 0)) |> 
-  select(length_of_admission_days, admission_nihss, admission_mrs_score, 
-         location_of_stroke, caregiver, prior_stroke, race, age, sex_male, 
+  filter(!is.na(discharge_location)) |> 
+  select(length_of_admission_days, admission_nihss, admission_mrs_score, admission_unit,
+         lesion_cortical, caregiver, prior_stroke, race, age, sex_male, side_of_stroke,
          bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_discharge, anxio_discharge, 
-         statin_discharge, htn, ischemic_heart_disease,discharge_location) |> # 178 cases
-  drop_na() # 75 cases
+         statin_discharge, htn, ischemic_heart_disease,discharge_location, cigarette_smoking) #|> # 382 cases drop_na() # 165 cases
+
+data_mdl2$caregiver <- factor(data_mdl2$caregiver)
+data_mdl2$prior_stroke <- factor(data_mdl2$prior_stroke)
+data_mdl2$antidep_discharge <- factor(data_mdl2$antidep_discharge)
+data_mdl2$anxio_discharge <- factor(data_mdl2$anxio_discharge)
+data_mdl2$statin_discharge <- factor(data_mdl2$statin_discharge)
+data_mdl2$lesion_cortical <- factor(data_mdl2$lesion_cortical)
+data_mdl2$sex_male <- factor(data_mdl2$sex_male)
+data_mdl2$dm <- factor(data_mdl2$dm)
+data_mdl2$htn <- factor(data_mdl2$htn)
+data_mdl2$ischemic_heart_disease <- factor(data_mdl2$ischemic_heart_disease)
+
+data_mdl2
 ```
 
 ```{r}
@@ -74,16 +107,21 @@ mdl2.test <- data_mdl2[-trainSet,]
 
 #tree
 library(tree)
-mdl2_tree1 <- tree(discharge_location ~ .,data=mdl2.train)
-plot(mdl2_tree1, col = "deeppink3", type = "uniform")
-text(mdl2_tree1, col = "royalblue3", pretty = 0)
+mdl2_tree1 <- tree(discharge_location ~ .#, minsize=2, mindev=0,
+                   data=mdl2.train)
+#look into tree.control, can control child node. min size, this way no pruning
+#tree() 
+plot(mdl2_tree1, col = "deeppink3", type = "uniform");text(mdl2_tree1, col = "royalblue3", pretty = 0, cex=.45)
 
 # Confusion Matrix for Tree
 library(DescTools) 
 
 mdl2.test$pred <- 
   predict(mdl2_tree1, newdata = mdl2.test, type = "class")
-with(mdl2.test, Conf(pred, discharge_location, pos = "Yes"))
+
+# Basic confusion matrix
+caret::confusionMatrix(mdl2.test$pred, mdl2.test$discharge_location)
+
 ```
 
 ```{r}
@@ -94,21 +132,104 @@ cv.mdl2tree1 <- cv.tree(mdl2_tree1) # default is 10-fold CV
 plot(cv.mdl2tree1$dev~cv.mdl2tree1$size,type="b",lwd=2,pch=19,col="darkorchid",
      main="10-fold CV results for MLBtree1\nTotal external deviance vs # of leaves",
      xlab="# of leaves",ylab="Total deviance (SSE) across all folds")
+cv.mdl2tree1$size[which.min(cv.mdl2tree1$dev)]
 
-prune.mdl2tree1 <- prune.tree(mdl2_tree1,best=7)
-plot(prune.mdl2tree1,col="firebrick")
-text(prune.mdl2tree1,col="royalblue3",cex=.5)
+prune.mdl2tree1 <- prune.tree(mdl2_tree1,best=5)
+plot(prune.mdl2tree1,col="firebrick");text(prune.mdl2tree1,col="royalblue3",cex=.5)
 
 mdl2.test$predprune <- 
   predict(prune.mdl2tree1, newdata = mdl2.test, type = "class")
-with(mdl2.test, Conf(predprune, discharge_location, pos = "Yes"))
+caret::confusionMatrix(mdl2.test$predprune, mdl2.test$discharge_location)
+```
 
-table(data_mdl2$discharge_location)
+# Multiple Imputation
+```{r MICE}
+mdl2_data_imp <- data_mdl2 
+imp <- mice(mdl2_data_imp, maxit=0)
+predM <- imp$predictorMatrix
+meth <- imp$method
+predM[, c("discharge_location")] <- 0
+set.seed(5010) 
+imp2 <- mice(mdl2_data_imp, m = 100, 
+             predictorMatrix = predM, 
+             method = meth, print =  FALSE)
+
+library(tree)
+results_list <- list()
+for (i in 1:100) {
+  data_i <- complete(imp2, i)
+  set.seed(5010)
+  train_idx <- sample.int(nrow(data_i), size = 0.8 * nrow(data_i))
+  train_i <- data_i[train_idx, ]
+  test_i <- data_i[-train_idx, ]
+  # Fit the tree
+  tree_i <- tree(discharge_location ~ .,
+                 data = train_i)
+  # Prune based on CV
+  cv_tree_i <- cv.tree(tree_i)
+  best_size <- cv_tree_i$size[which.min(cv_tree_i$dev)]
+  tree_i_pruned <- prune.tree(tree_i, best = best_size)
+  # Predict and evaluate
+  pred <- predict(tree_i_pruned, newdata = test_i, type = "class")
+  acc <- mean(pred == test_i$discharge_location)
+  results_list[[i]] <- list(tree = tree_i_pruned, accuracy = acc, pred = pred, truth = test_i$discharge_location)
+}
+```
+
+```{r}
+(mean_acc <- mean(sapply(results_list, function(x) x$accuracy)))
+sd_acc <- sd(sapply(results_list, function(x) x$accuracy))
+
+#plotting tree
+best_index <- which.max(sapply(results_list, function(x) x$accuracy))
+best_tree <- results_list[[best_index]]$tree
+plot(best_tree, col = "deeppink3", type = "uniform");text(best_tree, col = "royalblue3", pretty = 0)
 ```
 
 
-lesion location variable: have a group that has any cortical involvement and add to cortical group
+#testing other things
+```{r MICE with tree control}
+mdl2_data_imp <- data_mdl2 
+imp <- mice(mdl2_data_imp, maxit=0)
+predM <- imp$predictorMatrix
+meth <- imp$method
+predM[, c("discharge_location")] <- 0
+set.seed(5010) 
+imp2 <- mice(mdl2_data_imp, m = 100, 
+             predictorMatrix = predM, 
+             method = meth, print =  FALSE)
 
-including cortex: cortical 
-side of lesion: right and left
+library(tree)
+results_list <- list()
+for (i in 1:100) {
+  data_i <- complete(imp2, i)
+  set.seed(5010)
+  train_idx <- sample.int(nrow(data_i), size = 0.8 * nrow(data_i))
+  train_i <- data_i[train_idx, ]
+  test_i <- data_i[-train_idx, ]
+  # Fit the tree
+  tree_i <- tree(discharge_location ~ ., minsize=2, mindev=0,
+                 data = train_i)
+  # Prune based on CV
+  cv_tree_i <- cv.tree(tree_i)
+  best_size <- cv_tree_i$size[which.min(cv_tree_i$dev)]
+  tree_i_pruned <- prune.tree(tree_i, best = best_size)
+  # Predict and evaluate
+  pred <- predict(tree_i_pruned, newdata = test_i, type = "class")
+  acc <- mean(pred == test_i$discharge_location)
+  results_list[[i]] <- list(tree = tree_i_pruned, accuracy = acc, pred = pred, truth = test_i$discharge_location)
+}
+```
+
+```{r}
+(mean_acc <- mean(sapply(results_list, function(x) x$accuracy)))
+sd_acc <- sd(sapply(results_list, function(x) x$accuracy))
+
+#plotting tree
+best_index <- which.max(sapply(results_list, function(x) x$accuracy))
+best_tree <- results_list[[best_index]]$tree
+plot(best_tree, col = "deeppink3", type = "uniform");text(best_tree, col = "royalblue3", pretty = 0)
+```
+
+#can use the mult lin regr model to siggest which variables to look at when admitted patients come in 
 
