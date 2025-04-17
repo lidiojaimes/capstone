@@ -1,0 +1,180 @@
+---
+title: "Final Visualizations for Poster"
+author: "Lidio Jaimes Jr"
+date: "2025-04-17"
+output: pdf_document
+---
+A lot of data manipulation was done to make the visuals nice on poster. For example, discharge destinations were grouped together (expiration and other), people with no admission unit were grouped with others (had proper label), etc. None of these changes were a part of the analysis. 
+
+# Table 1
+```{r}
+ppl_with2_discharge <- 
+  stroke |> 
+  select(id_number,expiration,acute_rehabilitation,subacute_rehabilitation,
+         inpatient_rehabilitation,assited_living_facility,home_health,
+         home_with_no_needs,hospice,other_discharge_location) |> 
+  rowwise() |> 
+  mutate(row_sum = sum(c_across(-1), na.rm = TRUE)) |> 
+  ungroup() |> 
+  filter(row_sum==2)
+
+stroke_table1 <-
+  stroke |> 
+  mutate(
+    side_of_stroke = factor(side_of_stroke, 
+                            levels = c("Left","Right","Bilateral")),
+    admission_unit = case_when(
+           id_number%in%ppl_with2_discharge$id_number ~ "Other/NA",
+           admission_unit == "ICU" ~ "ICU",
+           admission_unit == "Stroke Unit" ~ "Stroke Unit",
+           admission_unit == "Observation Unit" ~ "Observation Unit",
+           admission_unit == "Admission transfer from ED" ~ "Admit transfer from ED",
+           TRUE ~ "Other/NA"),
+    admission_unit = factor(admission_unit,
+                            levels = c("Admit transfer from ED", "Observation Unit",
+                                       "Stroke Unit", "ICU", "Other/NA")),
+    discharge_location = case_when(
+      expiration == 1 ~ "Hospice/Expiration",
+      home_with_no_needs == 1 ~ "Home with no needs",
+      home_health == 1 | assited_living_facility == 1 ~ "Home health or assisted living",
+      subacute_rehabilitation == 1 ~ "Subacute rehab.",
+      inpatient_rehabilitation == 1 | acute_rehabilitation == 1 ~ "Inpatient or acute rehab.",
+      hospice == 1 ~ "Hospice/Expiration",
+      other_discharge_location == 1 ~ "Other"),
+    discharge_location = factor(discharge_location,
+                                levels = c("Home with no needs","Home health or assisted living",
+                                           "Subacute rehab.","Inpatient or acute rehab.",
+                                           "Hospice/Expiration","Other")),
+    antidep_discharge = ifelse(antidepressant_use == 2 | antidepressant_use == 3, 1, 0),
+    anxio_discharge = ifelse(anxiolytic_use == 2 | anxiolytic_use == 3, 1, 0),
+    statin_discharge = 
+           ifelse(str_detect(str_to_lower(medication_list_at_discharge), "statin"), 1, 0),
+    lesion_cortical=ifelse(cortical_stroke_location==1,"Cortical","Non-cortical"),
+    htn = ifelse(htn == 1, "Yes", "No"),
+    antidep_arrival = ifelse(antidep_arrival == 1, "Yes", "No"),
+    anxio_arrival = ifelse(anxio_arrival == 1, "Yes", "No"),
+    ischemic_heart_disease = ifelse(ischemic_heart_disease == 1, "Yes", "No"),
+    anxio_discharge = ifelse(anxio_discharge == 1, "Yes", "No"),
+    statin_discharge = ifelse(statin_discharge == 1, "Yes", "No"),
+    antidep_discharge = ifelse(antidep_discharge == 1, "Yes", "No")
+    ) |> 
+  filter(length_of_admission_days!=0 #log gives us -Inf
+         ) |>
+  select(admission_nihss, admission_mrs_score, admission_unit,
+         caregiver, prior_stroke, race, age, sex, 
+         bmi_kg_m_2, cholesterol_mg_d_l, dm, antidep_arrival, anxio_arrival,
+         htn, ischemic_heart_disease, cigarette_smoking, lesion_cortical, 
+         length_of_admission_days, side_of_stroke, discharge_location,anxio_discharge,
+         statin_discharge,antidep_discharge)
+
+
+stroke_table1$prior_stroke <- factor(stroke_table1$prior_stroke)
+stroke_table1$sex <- factor(stroke_table1$sex)
+stroke_table1$antidep_arrival <- factor(stroke_table1$antidep_arrival)
+stroke_table1$anxio_arrival <- factor(stroke_table1$anxio_arrival)
+stroke_table1$anxio_discharge <- factor(stroke_table1$anxio_discharge)
+stroke_table1$statin_discharge <- factor(stroke_table1$statin_discharge)
+stroke_table1$antidep_discharge <- factor(stroke_table1$antidep_discharge)
+stroke_table1$lesion_cortical <- factor(stroke_table1$lesion_cortical)
+stroke_table1$side_of_stroke <- factor(stroke_table1$side_of_stroke)
+stroke_table1$dm <- factor(stroke_table1$dm)
+stroke_table1$htn <- factor(stroke_table1$htn, levels = c("Yes","No"))
+stroke_table1$ischemic_heart_disease <- factor(stroke_table1$ischemic_heart_disease)
+
+#table 1
+label(stroke_table1$race) <- "Race"
+label(stroke_table1$age) <- "Age"
+label(stroke_table1$sex) <- "Sex"
+label(stroke_table1$htn) <- "Hypertension"
+label(stroke_table1$side_of_stroke) <- "Side of Stroke"
+label(stroke_table1$bmi_kg_m_2) <- "BMI"
+label(stroke_table1$cholesterol_mg_d_l) <- "Cholesterol"
+label(stroke_table1$admission_nihss) <- "Admission NIHSS"
+label(stroke_table1$admission_mrs_score) <- "Admission MRS"
+label(stroke_table1$admission_unit) <- "Admission Unit"
+label(stroke_table1$length_of_admission_days) <- "Length of Admission"
+label(stroke_table1$discharge_location) <- "Discharge Destination"
+
+
+units(stroke$age) <- "years"
+units(stroke$bmi_kg_m_2) <- "kg/m^2"
+units(stroke$cholesterol_mg_d_l) <- "mg/dL"
+units(stroke$length_of_admission_days) <- "days"
+
+table1(~ age + htn + bmi_kg_m_2 +
+         admission_nihss + admission_mrs_score + length_of_admission_days + discharge_location | admission_unit,
+       overall = c(left = "Overall"),
+       data = stroke_table1)
+```
+
+# Missingness Plot
+```{r}
+missing_plot_data <-
+  stroke |> 
+  mutate(
+    side_of_stroke = factor(side_of_stroke, 
+                            levels = c("Left","Right","Bilateral")),
+    
+    admission_unit = case_when(
+           id_number%in%ppl_with2_discharge$id_number ~ "Other",
+           admission_unit == "ICU" ~ "ICU",
+           admission_unit == "Stroke Unit" ~ "Stroke Unit",
+           admission_unit == "Observation Unit" ~ "Observation Unit",
+           admission_unit == "Admission transfer from ED" ~ "Admit transfer from ED",
+           admission_unit == "5" ~ "Other",
+           TRUE ~ NA),
+    admission_unit = factor(admission_unit,
+                            levels = c("Admit transfer from ED", "Observation Unit",
+                                       "Stroke Unit", "ICU", "Other")),
+    discharge_location = case_when(
+      expiration == 1 ~ "Hospice/Expiration",
+      home_with_no_needs == 1 ~ "Home with no needs",
+      home_health == 1 | assited_living_facility == 1 ~ "Home health or assisted living",
+      subacute_rehabilitation == 1 ~ "Subacute rehab.",
+      inpatient_rehabilitation == 1 | acute_rehabilitation == 1 ~ "Inpatient or acute rehab.",
+      hospice == 1 ~ "Hospice/Expiration",
+      other_discharge_location == 1 ~ "Other"),
+    discharge_location = factor(discharge_location,
+                                levels = c("Home with no needs","Home health or assisted living",
+                                           "Subacute rehab.","Inpatient or acute rehab.",
+                                           "Hospice/Expiration","Other")),
+    antidep_discharge = ifelse(antidepressant_use == 2 | antidepressant_use == 3, 1, 0),
+    anxio_discharge = ifelse(anxiolytic_use == 2 | anxiolytic_use == 3, 1, 0),
+    statin_discharge = 
+           ifelse(str_detect(str_to_lower(medication_list_at_discharge), "statin"), 1, 0),
+    lesion_cortical=ifelse(cortical_stroke_location==1,"Cortical","Non-cortical"),
+    htn = ifelse(htn == 1, "Yes", "No"),
+    antidep_arrival = ifelse(antidep_arrival == 1, "Yes", "No"),
+    anxio_arrival = ifelse(anxio_arrival == 1, "Yes", "No"),
+    ischemic_heart_disease = ifelse(ischemic_heart_disease == 1, "Yes", "No"),
+    anxio_discharge = ifelse(anxio_discharge == 1, "Yes", "No"),
+    statin_discharge = ifelse(statin_discharge == 1, "Yes", "No"),
+    antidep_discharge = ifelse(antidep_discharge == 1, "Yes", "No"),
+    caregiver = case_when(
+      caregiver == "Present" ~ 1,
+      caregiver == "Absent" ~ 0)
+    ) |> 
+  filter(length_of_admission_days!=0 #log gives us -Inf
+         ) |>
+  select(admission_nihss, caregiver, admission_mrs_score,
+         admission_unit, cholesterol_mg_d_l, side_of_stroke, prior_stroke, bmi_kg_m_2, antidep_arrival,
+         anxio_arrival, lesion_cortical, cigarette_smoking)
+
+visdat::vis_miss(select_if(missing_plot_data,~ any(is.na(.)))) +
+  labs(title="Missingness in stroke data")
+
+#want to fix axis so this:
+set.seed(123)
+n <- nrow(missing_plot_data)
+na_count <- round(0.22 * n)
+dummy <- rnorm(n)
+dummy[sample(1:n, na_count)] <- NA
+missing_plot_data$dummy_missing <- dummy
+
+VIM::aggr(missing_plot_data,
+          col = c("blue","red"),
+          numbers = TRUE,
+          labels = c("Admission NIHSS", "Caregiver", "Admission MRS", "Admission Unit", "Cholesterol", "Side of Stroke", "Prior Stroke", "BMI", "Antidep. Arrival", "Anxiolytic Arrival", "Cortical Lesion", "Smoking Hist.", "Dummy Missing"),
+          cex.axis=.4, gap=3,
+          ylab = c("Histogram of missing data", "Pattern")) + ylim(0, 0.2)
+```
