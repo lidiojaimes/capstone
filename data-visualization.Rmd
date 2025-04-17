@@ -4,6 +4,8 @@ author: "Lidio Jaimes Jr"
 date: "2024-10-21"
 output: pdf_document
 ---
+**This is all pretty outdated. All work from Fall Semester 2024**
+
 ```{r Table 1: Patient Demographics}
 label(stroke$race) <- "Race"
 label(stroke$age) <- "Age"
