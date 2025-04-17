@@ -12,7 +12,7 @@ library(table1)
 library(mice)
 ```
 
-```{r Reading in Data, include = FALSE}
+```{r Importing, include = FALSE}
 stroke_raw <- 
   readxl::read_xlsx("Capstone Combined Data Collection Sheets - Summer 2024.xlsx", 
                     skip = 1,
@@ -43,12 +43,14 @@ For paper: Patients 316 (105 days) and 322 (79 days) were removed from analyses.
 
 # Data Wrangling
 
-```{r Data Wrangling, include = FALSE}
+```{r Wrangling, include = FALSE}
 stroke$brainstem_stroke_lcation <- as.numeric(stroke$brainstem_stroke_lcation)
 
 stroke <-
   stroke |>
-  mutate(multiple_locations = ifelse(rowSums(stroke[,106:110], na.rm = TRUE) > 1, 1, 0),
+  mutate(multiple_locations = 
+           ifelse(rowSums(stroke[,106:110], na.rm = TRUE) > 1, 
+                  1, 0), #multiple stroke locations indicator
          location_of_stroke = 
            case_when(
              multiple_locations==0 & brainstem_stroke_lcation == 1 ~ "brainstem",
@@ -63,7 +65,7 @@ stroke <-
                                      labels = c("Brainstem","Cerebellum",
                                                 "Cortical","Subcortical",
                                                 "Multiple Locations")),
-         lesion_cortical=ifelse(cortical_stroke_location==1,1,0), #cortical location indictor
+         lesion_cortical=ifelse(cortical_stroke_location==1,1,0), #cortical location indicator
          race = ifelse(race=="Other","Other","White"),
          race = case_when(
            race == "White" ~ "White",
@@ -73,6 +75,7 @@ stroke <-
          age = ifelse(is.na(age),estimated_age,age),
          age = as.numeric(age),
          admission_nihss = as.numeric(admission_nihss),
+         admission_mrs_score = as.numeric(admission_mrs_score),
          cholesterol_mg_d_l = as.numeric(cholesterol_mg_d_l),
          prior_stroke = case_when(
            prior_stroke == 0 ~ "No",
@@ -118,7 +121,6 @@ stroke <-
            presence_of_caregiver == "1" ~ "Present",
            TRUE ~ "Unknown"),
          caregiver = factor(caregiver),
-         admission_mrs_score = as.numeric(admission_mrs_score),
          pt_am_pac_score = as.numeric(pt_am_pac_score),
          discharge_nihss = as.numeric(discharge_nihss),
          discharge_mrs_score = as.numeric(discharge_mrs_score),
@@ -153,26 +155,6 @@ Patients with Race classified as other are either: Other(Native American and Nat
 Notes for paper: weird entry for presence of caregiver for 18, set as unknown.
 
 **medication** use (anticoagulants, statins, antidepressants, anxiolytics): Medication data at arrival only available from patients 375 and onward (some still missing after). 
-
-```{r New data, include = FALSE}
-# New data
-library(readxl)
-newstroke_raw <- 
-  readxl::read_xlsx("Lesion Location (Artery) 2025 no id.xlsx", 
-                    sheet = "main - for importing",
-                    # range = cell_cols(c("A:C","E:F","CI","CP:CQ","DX:EJ","EN")),
-                    range = cell_cols("A:W"),
-                    na = c("", " ", "UNK", "Unk", "NA", "na", "Na", 9999, "????"),
-                    skip = 1, 
-                    col_names = TRUE)
-names(newstroke_raw) <- newstroke_raw[1,] 
-newstroke_raw <- newstroke_raw[-c(1:2),] |> janitor::clean_names()
-newstroke_raw$date_of_stroke = openxlsx::convertToDate(newstroke_raw$date_of_stroke)
-newstroke_raw$discharge_date = openxlsx::convertToDate(newstroke_raw$discharge_date)
-newstroke_raw$expiration_date = openxlsx::convertToDate(newstroke_raw$expiration_date)
-
-newstroke_raw
-```
 
 
 
