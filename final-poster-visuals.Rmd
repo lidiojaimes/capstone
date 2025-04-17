@@ -6,6 +6,12 @@ output: pdf_document
 ---
 A lot of data manipulation was done to make the visuals nice on poster. For example, discharge destinations were grouped together (expiration and other), people with no admission unit were grouped with others (had proper label), etc. None of these changes were a part of the analysis. 
 
+```{r Importing libraries}
+library(table1)
+# library(visdat)
+# library(VIM)
+```
+
 # Table 1
 ```{r}
 ppl_with2_discharge <- 
