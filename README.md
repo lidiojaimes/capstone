@@ -1,4 +1,4 @@
-This is for 2024-2025 Statistical Capstone Project
+This is for 2024-2025 UGA Senior Statistical Capstone Project
 
 The order to run Rmd's: 
   1. data-cleaning.Rmd
