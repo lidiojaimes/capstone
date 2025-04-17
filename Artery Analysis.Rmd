@@ -1,0 +1,105 @@
+---
+title: "Artery Analysis"
+author: "Lidio Jaimes Jr"
+date: "2025-04-17"
+output: pdf_document
+---
+This is regarding the new dataset that's artery specific
+```{r Importing datset, include = FALSE}
+# New data
+library(readxl)
+newstroke_raw <- 
+  readxl::read_xlsx("Lesion Location (Artery) 2025 no id.xlsx", 
+                    sheet = "main - for importing",
+                    # range = cell_cols(c("A:C","E:F","CI","CP:CQ","DX:EJ","EN")),
+                    range = cell_cols("A:W"),
+                    na = c("", " ", "UNK", "Unk", "NA", "na", "Na", 9999, "????"),
+                    skip = 1, 
+                    col_names = TRUE)
+names(newstroke_raw) <- newstroke_raw[1,] 
+newstroke_raw <- newstroke_raw[-c(1:2),] |> janitor::clean_names()
+newstroke_raw$date_of_stroke = openxlsx::convertToDate(newstroke_raw$date_of_stroke)
+newstroke_raw$discharge_date = openxlsx::convertToDate(newstroke_raw$discharge_date)
+newstroke_raw$expiration_date = openxlsx::convertToDate(newstroke_raw$expiration_date)
+newstroke_raw$year_of_birth = as.numeric(newstroke_raw$year_of_birth)
+newstroke_raw$age = as.numeric(newstroke_raw$age)
+newstroke_raw$ischemic = factor(newstroke_raw$ischemic)
+newstroke_raw$sex = factor(newstroke_raw$sex)
+newstroke_raw$by_mix <- 
+  paste(newstroke_raw$year_of_birth, newstroke_raw$age, newstroke_raw$sex, 
+        newstroke_raw$date_of_stroke, newstroke_raw$discharge_date, newstroke_raw$expiration_date,
+        sep = ",")
+
+newstroke_raw <- 
+  newstroke_raw %>%
+  distinct(by_mix, .keep_all = TRUE)
+
+stroke_prejoin <- 
+  stroke |> 
+  mutate(id_number = as.numeric(id_number),
+         ischemic = factor(ischemic),
+         sex = factor(sex),
+         by_mix = paste(year_of_birth, age, sex, date_of_stroke, discharge_date,
+                        expiration_date, sep = ",")) |>
+  distinct(by_mix, .keep_all = TRUE) #two patients entered twice
+
+new_with_id <- 
+  inner_join(stroke_prejoin,newstroke_raw,by="by_mix",relationship = "one-to-one") |> 
+  select(id_number,length_of_admission_days,admission_nihss,admission_mrs_score,aca:266) |> 
+  select(-c(other.y,not_stated,artery_notes.y,lesion_location_notes.y))
+```
+
+```{r Cleaning dataset}
+new_with_id_complete <-
+  new_with_id |> 
+  na.omit()
+
+new_with_id_complete[, c(5:16)] <- lapply(new_with_id_complete[, c(5:16)], as.numeric)
+ppl_with2_artery <- 
+  new_with_id_complete |> 
+  rowwise() |> 
+  mutate(row_sum = sum(c_across(-c(1:4)), na.rm = TRUE)) |> 
+  ungroup() |> 
+  filter(row_sum==2)
+new_with_id_complete[, c(5:16)] <- lapply(new_with_id_complete[, c(5:16)], as.factor)
+
+new_with_id_complete <- 
+  new_with_id_complete |> 
+  filter(!id_number%in%ppl_with2_artery$id_number) |> 
+  mutate(primary_artery = case_when(
+    aca == 1 ~ "aca",
+    mca == 1 ~ "mca",
+    pca == 1 ~ "pca",
+    ica == 1 ~ "ica",
+    pica == 1 ~ "pica",
+    basilar_artery == 1 ~ "basilar_artery",
+    vertebrobasilar == 1 ~ "vertebrobasilar",
+    vertebral_artery == 1 ~ "vertebral_artery",
+    superior_cerebellar_artery == 1 ~ "superior_cerebellar_artery",
+    anterior_inferior_cerebellar_artery == 1 ~ "anterior_inferior_cerebellar_artery",
+    common_carotid_artery == 1 ~ "common_carotid_artery",
+    subclavian_artery == 1 ~ "subclavian_artery"),
+    primary_artery = factor(primary_artery))
+```
+
+```{r Missingness}
+visdat::vis_miss(select_if(new_with_id,~ any(is.na(.)))) +
+  labs(title="Missingness in stroke data")
+```
+
+# One way ANOVA
+$$H_0:\mu_{aca}=\mu_{mca}=\mu_{pca}=\space ...\space =\mu_{subclavian} \\H_1:\text{ at least two means differ}$$
+
+```{r}
+anova_model <- aov(length_of_admission_days ~ primary_artery, data = new_with_id_complete)
+summary(anova_model)
+TukeyHSD(anova_model)
+new_with_id_complete |> 
+  group_by(primary_artery) |> 
+  summarise(avg_length_stay = mean(length_of_admission_days),
+            n()) |> 
+  arrange(desc(avg_length_stay))
+
+par(mfrow = c(1, 2));plot(anova_model, which = 1);plot(anova_model, which = 2)
+```
+
