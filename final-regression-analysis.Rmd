@@ -4,6 +4,16 @@ author: "Lidio Jaimes Jr"
 date: "2025-04-13"
 output: pdf_document
 ---
+```{r Importing Libraries}
+library(naniar)
+library(forestplot)
+library(mice)
+# library(visdat)
+# library(VIM)
+# library(corrplot)
+# library(kableExtra)
+```
+
 # Multiple Imputation
 This data set will exclude **statin at arrival**. If we want to include it, then look after second year of data entry.
 
@@ -69,7 +79,6 @@ VIM::aggr(mdl1_data,
 ## Checking conditions for MICE
 
 ```{r MCAR vs MAR}
-library(naniar)
 mcar_test(mdl1_data[mdl1_data$length_of_admission_days!=0,]) #NOT MCAR
 miss_var_summary(mdl1_data)
 ```
@@ -194,8 +203,6 @@ glance(res_final)
 
 ## Forest plot for stepwise model
 ```{r Making Forest Plot Dataset}
-library(forestplot)
-
 fp_data2 <- regression_table[-1,]
 fp_data2$labeltext <- c("Admission NIHSS", "Admission MRS", "Side of Stroke - Right", 
                        "Side of Stroke - Bilateral", "Admission Unit - Observation", 
