@@ -4,6 +4,8 @@ author: "Lidio Jaimes Jr"
 date: "2025-02-21"
 output: pdf_document
 ---
+**This work is outdated. This was pre-MICE. Not needed**
+
 ```{r,include=FALSE}
 library(tidyverse)
 library(forcats)
