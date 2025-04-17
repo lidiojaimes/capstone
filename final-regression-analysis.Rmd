@@ -4,147 +4,6 @@ author: "Lidio Jaimes Jr"
 date: "2025-04-13"
 output: pdf_document
 ---
-#THIS IS FOR KNIT
-```{r Importing libraries, include = FALSE}
-library(tidyverse)
-library(forcats)
-library(table1)
-library(mice)
-```
-
-```{r Reading in Data, include = FALSE}
-stroke_raw <- 
-  readxl::read_xlsx("Capstone Combined Data Collection Sheets - Summer 2024.xlsx", 
-                    skip = 1,
-                    na=c("", " ", "UNK", "Unk", "NA", "na", "Na", 9999, "????")) |> 
-  janitor::clean_names()
-stroke <- stroke_raw[-c(1,376), ] #get rid of dictionary and black row
-
-# E336 (patient 333) and E340 (patient 337) have full date instead of just year
-stroke[stroke$id_number == 333, "year_of_birth"] = 1905 #set as 1981 instead of 1905
-stroke[stroke$id_number == 337, "year_of_birth"] = 1942
-stroke$date_identified = openxlsx::convertToDate(stroke$date_identified)
-stroke$discharge_date = openxlsx::convertToDate(stroke$discharge_date)
-stroke$date_of_stroke = openxlsx::convertToDate(stroke$date_of_stroke)
-stroke$expiration_date_in_hospital = openxlsx::convertToDate(stroke$expiration_date_in_hospital)
-stroke$expiration_date = openxlsx::convertToDate(stroke$expiration_date)
-stroke$length_of_admission_days = round(as.numeric(stroke$length_of_admission_days),0)
-
-stroke <- 
-  stroke |> 
-  filter(!id_number%in%c(211, 391, 528, 529, 536, 537, 555, 558, 576, 582),
-         !id_number%in%c(316,322),
-         ischemic == 1)
-```
-
-```{r Data Wrangling, include = FALSE}
-stroke$brainstem_stroke_lcation <- as.numeric(stroke$brainstem_stroke_lcation)
-
-stroke <-
-  stroke |>
-  mutate(multiple_locations = ifelse(rowSums(stroke[,106:110], na.rm = TRUE) > 1, 1, 0),
-         location_of_stroke = 
-           case_when(
-             multiple_locations==0 & brainstem_stroke_lcation == 1 ~ "brainstem",
-             multiple_locations==0 & cerebellum_stroke_location == 1 ~ "cerebellum",
-             multiple_locations==0 & cortical_stroke_location == 1 ~ "cortical",
-             multiple_locations==0 & subcortical_stroke_location == 1 ~ "subcortical",
-             multiple_locations==1 ~ "multiple locations"),
-         location_of_stroke = factor(location_of_stroke,
-                                     levels = c("brainstem","cerebellum",
-                                                "cortical","subcortical",
-                                                "multiple locations"),
-                                     labels = c("Brainstem","Cerebellum",
-                                                "Cortical","Subcortical",
-                                                "Multiple Locations")),
-         lesion_cortical=ifelse(cortical_stroke_location==1,1,0), #cortical location indictor
-         race = ifelse(race=="Other","Other","White"),
-         race = case_when(
-           race == "White" ~ "White",
-           str_detect(patient_identification_notes, "African") ~ "Black",
-           TRUE ~ "Other"),
-         race = factor(race, levels = c("White", "Black", "Other")),
-         age = ifelse(is.na(age),estimated_age,age),
-         age = as.numeric(age),
-         admission_nihss = as.numeric(admission_nihss),
-         cholesterol_mg_d_l = as.numeric(cholesterol_mg_d_l),
-         prior_stroke = case_when(
-           prior_stroke == 0 ~ "No",
-           prior_stroke == 1 ~ "Yes"),
-         prior_tia = case_when(
-           prior_tia == 0 ~ "No",
-           prior_tia == 1 ~ "Yes"),
-         cholesterol_group = case_when(
-           cholesterol_mg_d_l < 200 ~ "Normal",
-           cholesterol_mg_d_l >= 200 & cholesterol_mg_d_l <=239 ~ "Borderline high",
-           cholesterol_mg_d_l >= 240 ~ "High"),
-         cholesterol_group = factor(cholesterol_group,
-                                    levels = c("Normal","Borderline high","High")),
-         cigarette_smoking = case_when(
-           cigarette_smoking == "Former" | cigarette_smoking == "former" ~ "Former",
-           cigarette_smoking == "Never" | cigarette_smoking == "NEver" ~ "Never",
-           cigarette_smoking == "Current" | cigarette_smoking == "Current\r\n\rCurrent" ~ "Current"),
-         cigarette_smoking = factor(cigarette_smoking,
-                                    levels = c("Never","Former","Current")),
-         #ischemic_heart_disease = ifelse(ischemic_heart_disease == 0, "No", "Yes"),
-         ischemic_heart_disease = as.numeric(ischemic_heart_disease),
-         htn = as.numeric(htn),
-         antidepressant_use = as.numeric(antidepressant_use),
-         anxiolytic_use = as.numeric(anxiolytic_use),
-         date_cov19 = ifelse(date_of_stroke>="2020-03-15","after covid","before covid"),
-         covid_19 = ifelse(date_cov19=="before covid","No",covid_19),
-         covid_19 = case_when(
-           covid_19 == "No" ~ "No",
-           covid_19 == "Yes (Once)" ~ "Yes",
-           covid_19 == "positive" ~ "Yes",
-           covid_19 == "negative" ~ "No"),
-         antidep_arrival = ifelse(antidepressant_use == 1, 1, 0),
-         anxio_arrival = ifelse(anxiolytic_use == 1, 1, 0),
-         statin_arrival = 
-           ifelse(str_detect(medication_list_at_arrival, "Statin"), 1, 0),
-         # anticoag_arrival =
-         #   ifelse(str_detect(medication_list_at_arrival, "Anticoagulants"), 1, 0),
-         dm = factor(dm,levels=c(0,1),labels=c("No","Yes")),
-         depression = factor(depression,levels=c(0,1),labels=c("No","Yes")),
-         length_of_admission_days = as.numeric(length_of_admission_days),
-         caregiver = case_when(
-           presence_of_caregiver == "0" ~ "Absent",
-           presence_of_caregiver == "1" ~ "Present",
-           TRUE ~ "Unknown"),
-         caregiver = factor(caregiver),
-         admission_mrs_score = as.numeric(admission_mrs_score),
-         pt_am_pac_score = as.numeric(pt_am_pac_score),
-         discharge_nihss = as.numeric(discharge_nihss),
-         discharge_mrs_score = as.numeric(discharge_mrs_score),
-         ot_am_pac_score = as.numeric(ot_am_pac_score),
-         log_lengthhospitalstay = log(length_of_admission_days),
-         side_of_stroke = case_when(
-           side_of_stroke == 1 ~ "Right",
-           side_of_stroke == 2 ~ "Left",
-           side_of_stroke == 3 ~ "Bilateral",
-           TRUE ~ NA),
-         side_of_stroke = 
-           factor(side_of_stroke,
-                  levels = c("Right","Left","Bilateral")),
-         admission_unit = case_when( #there are ppl with two admission units
-           admission_unit == "1" ~ "ICU",
-           admission_unit == "2" ~ "Stroke Unit",
-           admission_unit == "3" ~ "Observation Unit",
-           admission_unit == "4" ~ "Admission transfer from ED",
-           admission_unit == "5" ~ "Other",
-           TRUE ~ NA),
-         admission_unit = factor(admission_unit,
-                                 levels = c("ICU", "Stroke Unit", "Observation Unit",
-                                            "Admission transfer from ED", "Other")))
-
-stroke[stroke$id_number==532,"race"] = "Other"
-stroke[stroke$id_number==223,"race"] = "Other"
-stroke[, c(172,174:177,179:182)] <- lapply(stroke[, c(172,174:177,179:182)], as.numeric)
-```
-
-
-
-
 # Multiple Imputation
 This data set will exclude **statin at arrival**. If we want to include it, then look after second year of data entry.
 
@@ -194,7 +53,8 @@ mdl1_data_complete <-
   mdl1_data[complete.cases(mdl1_data),]
 ```
 
-```{r Completeness}
+## Missingness
+```{r Visualizing missing data}
 visdat::vis_miss(select_if(mdl1_data,~ any(is.na(.)))) +
   labs(title="Missingness in stroke data")
 
@@ -206,17 +66,18 @@ VIM::aggr(mdl1_data,
           ylab = c("Histogram of missing data", "Pattern"))
 ```
 
-## Looking at missingness
+## Checking conditions for MICE
+
 ```{r MCAR vs MAR}
 library(naniar)
 mcar_test(mdl1_data[mdl1_data$length_of_admission_days!=0,]) #NOT MCAR
 miss_var_summary(mdl1_data)
 ```
 
-Assuming the data is MAR. What drives the missingness for admission scores?
+Assuming the data is MAR. **What drives the missingness for admission scores?**
 
-## Checking normality
-```{r checking normality, eval=FALSE}
+This is just to check before runnning MICE
+```{r Normality, eval=FALSE}
 mdl1_data_numeric <- mdl1_data |> select(-1) |> select_if(is.numeric)
 for (col in colnames(mdl1_data_numeric)) {
   hist(mdl1_data_numeric[[col]], main = paste(col))
@@ -225,14 +86,7 @@ for (col in colnames(mdl1_data_numeric)) {
 
 Only age, bmi, cholesterol, and log length hospital stay can be argued for being normally distributed
 
-## Checking multicollinearity
-```{r checking for multicollinearity}
-# cor(sample(na.omit(mdl1_data$bmi_kg_m_2),200),
-#     sample(na.omit(mdl1_data$cholesterol_mg_d_l),200))
-# 
-# cor(sample(na.omit(mdl1_data$admission_mrs_score),250),
-#     sample(na.omit(mdl1_data$admission_nihss),250))
-
+```{r Multicollinearity}
 mdl1_data |> 
   select_if(is.numeric) |> 
   na.omit() |> # 271 patients
@@ -240,7 +94,10 @@ mdl1_data |>
   corrplot::corrplot.mixed()
 ```
 
-$$\log[\text{Length of admission days}] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{Cortical Lesion}_i + \beta_6\text{AdmissionUnit-Observation}_i + \beta_7\text{AdmissionUnit-Stroke}_i +\beta_8\text{AdmissionUnit-ICU}_i + \\ \beta_9\text{AdmissionUnit-Other}_i +  \beta_{10}\text{Prior Stroke}_i + \beta_{11}\text{Diabetes} + \beta_{12}\text{Hypertension} + \beta_{13}\text{IschemicHeartDisease} + \\ \beta_{14}\text{Antidepressants}_i + \beta_{15}\text{Anxiolytics}_i + \beta_{16}\text{SmokingHistory-Former} + \beta_{17}\text{SmokingHistory-Current} + \\ \beta_{18}\text{CaregiverPresence}_i +  \beta_{19}\text{Race-Black}_i + \beta_{20}\text{Race-Other}_i + \beta_{21}\text{Age}_i + \beta_{22}\text{Sex-Male}_i + \beta_{23}\text{BMI}_i + \beta_{24}\text{Cholesterol}_i + \epsilon_i$$
+No alarming multicollinearity
+
+# Initial Model
+$$\log[\text{Length of admission days}_i] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{Cortical Lesion}_i + \beta_6\text{AdmissionUnit-Observation}_i + \beta_7\text{AdmissionUnit-Stroke}_i +\beta_8\text{AdmissionUnit-ICU}_i + \\ \beta_9\text{AdmissionUnit-Other}_i +  \beta_{10}\text{Prior Stroke}_i + \beta_{11}\text{Diabetes} + \beta_{12}\text{Hypertension} + \beta_{13}\text{IschemicHeartDisease} + \\ \beta_{14}\text{Antidepressants}_i + \beta_{15}\text{Anxiolytics}_i + \beta_{16}\text{SmokingHistory-Former} + \beta_{17}\text{SmokingHistory-Current} + \\ \beta_{18}\text{CaregiverPresence}_i +  \beta_{19}\text{Race-Black}_i + \beta_{20}\text{Race-Other}_i + \beta_{21}\text{Age}_i + \beta_{22}\text{Sex-Male}_i + \beta_{23}\text{BMI}_i + \beta_{24}\text{Cholesterol}_i + \epsilon_i$$
 
 ## Running MICE and Regression
 ```{r MICE}
@@ -256,11 +113,7 @@ imp2 <- mice(mdl1_data_imp, m = 100,
              predictorMatrix = predM, 
              method = meth, print =  FALSE)
 
-# head(imp2$imp$admission_nihss) # a lot of variability in imputed values for nihss
-# tail(imp2$imp$admission_nihss)
-
 imp_long <- mice::complete(imp2, action="long", include = TRUE)
-#confused on why some changed to numeric and log
 imp_long_mids<-as.mids(imp_long)
 fitimp <- with(imp_long_mids,
                lm(log(length_of_admission_days) ~ admission_nihss + admission_mrs_score + 
@@ -271,7 +124,7 @@ fitimp <- with(imp_long_mids,
 ```
 
 ## MICE output
-```{r final MICE output}
+```{r MICE output}
 res <- pool(fitimp)
 summary(res)
 
@@ -292,38 +145,35 @@ regression_table$`p-value` <- ifelse(regression_table$`p-value` < 0.001,
 
 kableExtra::kable(regression_table)
 glance(res)
-#visreg making sense of regression
-#make lob length of stay in the model, visreg can do length of admission days back to og scale
-#gtsummary::tbl_regression(res)
 ```
 
-# need to run stepwise
-```{r running stepwise}
+# Stepwise
+```{r MICE Stepwise}
 set.seed(5010)
 selected_vars <- list()
-for (i in 1:100) { # Run stepwise on each imputed dataset
+for (i in 1:100) {
   data_i <- complete(imp2, i)
-  
   full_model <- lm(log(length_of_admission_days) ~ admission_nihss + admission_mrs_score + 
                     side_of_stroke + lesion_cortical + admission_unit + prior_stroke + 
                     dm + htn + ischemic_heart_disease + antidep_arrival + anxio_arrival +
                     cigarette_smoking + caregiver + race + age + sex_male + bmi_kg_m_2 +
                     cholesterol_mg_d_l,
                    data = data_i)
-  step_model <- step(full_model, direction = "both", trace = FALSE)
+  step_model <- step(full_model, direction = "both", trace = FALSE) #stepwise on each mdl
   selected_vars[[i]] <- names(coef(step_model))
 }
 
-sort(table(unlist(selected_vars)), decreasing = TRUE) #frequency of selected variables
+sort(table(unlist(selected_vars)), decreasing = TRUE) #frequency of selected variables, want 70%
 
-fit_final <- with(imp2, # fitting model on each imputed dataset and pool
+fit_final <- with(imp2, #run final stepwise mdl to all 100 datasets
                   lm(log(length_of_admission_days) ~ 
                        admission_nihss + admission_mrs_score + side_of_stroke + 
                        admission_unit + htn + age + bmi_kg_m_2 + cholesterol_mg_d_l))
 ```
 
-$$\log[\text{Length of admission days}] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{AdmissionUnit-Observation}_i + \beta_6\text{AdmissionUnit-Stroke}_i +\beta_7\text{AdmissionUnit-ICU}_i +  \beta_8\text{AdmissionUnit-Other}_i + \\\beta_{9}\text{Hypertension} + \beta_{10}\text{Age}_i + \beta_{11}\text{BMI}_i + \beta_{12}\text{Cholesterol}_i + \epsilon_i$$
-```{r stepwise results}
+$$\log[\text{Length of admission days}_i] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{AdmissionUnit-Observation}_i + \beta_6\text{AdmissionUnit-Stroke}_i +\beta_7\text{AdmissionUnit-ICU}_i +  \beta_8\text{AdmissionUnit-Other}_i + \\\beta_{9}\text{Hypertension} + \beta_{10}\text{Age}_i + \beta_{11}\text{BMI}_i + \beta_{12}\text{Cholesterol}_i + \epsilon_i$$
+
+```{r Stepwise Results}
 res_final <- pool(fit_final)
 summary(res_final)
 
@@ -342,11 +192,55 @@ kableExtra::kable(regression_table)
 glance(res_final)
 ```
 
-# interest in interaction terms
+## Forest plot for stepwise model
+```{r Making Forest Plot Dataset}
+library(forestplot)
+
+fp_data2 <- regression_table[-1,]
+fp_data2$labeltext <- c("Admission NIHSS", "Admission MRS", "Side of Stroke - Right", 
+                       "Side of Stroke - Bilateral", "Admission Unit - Observation", 
+                       "Admission Unit - Stroke", "Admission Unit - ICU", "Admission Unit - Other", 
+                       "Hypertension", "Age", "BMI", "Cholesterol")
+fp_data2$display_est <- round(fp_data2$Estimate,3)
+fp_data2$lower<- round(fp_data2$Estimate - 1.96 * fp_data2$`Standard Error`,3)
+fp_data2$upper<- round(fp_data2$Estimate + 1.96 * fp_data2$`Standard Error`,3)
+fp_data2$ci <- paste0("(", fp_data2$lower, ", ", fp_data2$upper, ")")
+fp_data2$pval <- fp_data2$`p-value`
+
+table_text <- cbind(
+  c(fp_data2$labeltext),
+  c(as.character(fp_data2$display_est)),
+  c(fp_data2$ci),
+  c(as.character(fp_data2$pval)))
+```
+
+```{r Forest Plot}
+forestplot(labeltext = table_text,
+           mean = c(fp_data2$display_est),
+           lower = c(fp_data2$lower),
+           upper = c(fp_data2$upper),
+           zero = 1,
+           boxsize = 0.3,
+           lineheight = unit(1, "cm"),
+           col = forestplot::fpColors(box="#BA0C2F", line="black", summary="royalblue"),
+           xlab = "",
+           title = "Forest Plot of Regression Coefficients of Stepwise Model",
+           txt_gp = fpTxtGp(
+             label = gpar(fontfamily = "Times", col = "black"),
+             ticks = gpar(fontfamily = "Times", col = "black")))|> 
+  fp_add_header("Covariates" |> fp_align_center(),
+                    "Est." |> fp_align_center(),
+                    "95% C.I." |> fp_align_center(),
+                    "P-Val" |> fp_align_center()) |> 
+  fp_set_zebra_style("#EFEFEF")
+```
+
+# interest in interaction terms 
+running stepwise on 100 imputed datasets with all interaction terms
 ```{r}
 set.seed(5010)
 selected_vars <- list()
-for (i in 1:100) { # Run stepwise on each imputed dataset
+for (i in 1:100) {
   data_i <- complete(imp2, i)
   
   full_model <- lm(log(length_of_admission_days) ~ .^2,
