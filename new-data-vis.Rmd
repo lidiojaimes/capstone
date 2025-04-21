@@ -1,0 +1,69 @@
+---
+title: "Data Visualization Semester 2"
+author: "Lidio Jaimes Jr"
+date: "2025-04-21"
+output: pdf_document
+---
+```{r Figure 1}
+stroke |> 
+  ggplot(aes(x = length_of_admission_days,
+             y = fct_rev(admission_unit),
+             fill = admission_unit)) + 
+  geom_violin(alpha = .5) + 
+  geom_boxplot(width = .15, fill = "grey", alpha = .2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Length of Admission (days)") + 
+  ylab("Admission Unit")
+```
+
+```{r Figure 2}
+stroke |>
+  # mutate(expiration = factor(expiration, levels = c(0, 1), labels = c("No", "Yes"))) |> 
+  # filter(expiration=="No") |> 
+  ggplot(aes(x=length_of_admission_days,y=depression,fill=depression))+
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Length of Admission (days)") + 
+  ylab("Depression")
+```
+
+```{r Figure 3: Diabetes}
+stroke |> 
+  mutate(
+    lesion_cortical = ifelse(lesion_cortical == 0, "No","Yes"),
+    lesion_cortical = factor(lesion_cortical,
+                             levels = c("Yes","No"))) |> 
+  group_by(lesion_cortical,dm) |> 
+  summarise(median_loa=median(length_of_admission_days,na.rm=TRUE)) |> #loa = length of admission
+  filter(!is.na(dm)) |> 
+  ggplot(aes(x = (lesion_cortical),
+             y = median_loa,
+             fill = dm)) + 
+  geom_bar(stat = "identity", position = "dodge", width = 0.75, color="black") +
+  scale_fill_manual(name = "Diabetic",
+                     labels = c("No","Yes"),
+                     values = c("#F8766D","#00BFC4")) + 
+  theme_bw() +
+  xlab("Cortical Lesion Location") + 
+  ylab("Median Length of Admission (days)")+
+  ggtitle("Length of Admission by Cortical Lesion and Diabetes Status")
+```
+
+```{r Figure 4: location of stroke vs age}
+stroke |> 
+  mutate(
+    lesion_cortical = ifelse(lesion_cortical == 0, "No","Yes"),
+    lesion_cortical = factor(lesion_cortical,
+                             levels = c("Yes","No"))) |> 
+  ggplot(aes(y=age,x=fct_rev(lesion_cortical),fill=lesion_cortical)) + 
+  geom_violin(alpha=.5) + 
+  geom_boxplot(width=.15,fill="grey",alpha=.2)+
+  theme_bw() +
+  theme(legend.position = "none") + 
+  xlab("Cortical Lesion Location") + 
+  ylab("Age") +
+  ggtitle("Age Distribution by Cortical Lesion Status")
+```
