@@ -4,7 +4,7 @@ author: "Lidio Jaimes Jr"
 date: "2025-04-21"
 output: pdf_document
 ---
-```{r Figure 1}
+```{r Figure 1: length of stay vs admission unit}
 stroke |> 
   ggplot(aes(x = length_of_admission_days,
              y = fct_rev(admission_unit),
