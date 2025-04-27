@@ -41,7 +41,7 @@ mdl1_data <-
     admission_unit = factor(admission_unit,
                             levels = c("Admission transfer from ED", "Observation Unit",
                                        "Stroke Unit", "ICU", "Other"))) |> 
-  filter(length_of_admission_days!=0) |> #log gives us -Inf
+  filter(length_of_admission_days!=0) |> #log gives us -Inf, also removes NA's
   select(#id_number, location_of_stroke,
          admission_nihss, admission_mrs_score, admission_unit,
          caregiver, prior_stroke, race, age, sex_male, 
@@ -177,10 +177,10 @@ sort(table(unlist(selected_vars)), decreasing = TRUE) #frequency of selected var
 fit_final <- with(imp2, #run final stepwise mdl to all 100 datasets
                   lm(log(length_of_admission_days) ~ 
                        admission_nihss + admission_mrs_score + side_of_stroke + 
-                       admission_unit + htn + age + bmi_kg_m_2 + cholesterol_mg_d_l))
+                       admission_unit + htn + age + bmi_kg_m_2))
 ```
 
-$$\log[\text{Length of admission days}_i] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{AdmissionUnit-Observation}_i + \beta_6\text{AdmissionUnit-Stroke}_i +\beta_7\text{AdmissionUnit-ICU}_i +  \beta_8\text{AdmissionUnit-Other}_i + \\\beta_{9}\text{Hypertension} + \beta_{10}\text{Age}_i + \beta_{11}\text{BMI}_i + \beta_{12}\text{Cholesterol}_i + \epsilon_i$$
+$$\log[\text{Length of admission days}_i] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{AdmissionUnit-Observation}_i + \beta_6\text{AdmissionUnit-Stroke}_i +\beta_7\text{AdmissionUnit-ICU}_i +  \beta_8\text{AdmissionUnit-Other}_i + \\\beta_{9}\text{Hypertension} + \beta_{10}\text{Age}_i + \beta_{11}\text{BMI}_i + \epsilon_i$$
 
 ```{r Stepwise Results}
 res_final <- pool(fit_final)
@@ -191,7 +191,7 @@ regression_table[,2:6] <- round(regression_table[,2:6],5)
 regression_table$estimate <- exp(regression_table$estimate)
 regression_table$term <- c("Intercept", "Admission NIHSS", "Admission MRS", "Side of Stroke - Right", 
                            "Side of Stroke - Bilateral", "Admission Unit - Observation", "Admission Unit - Stroke", 
-                           "Admission Unit - ICU", "Admission Unit - Other", "Hypertension", "Age", "BMI", "Cholesterol")
+                           "Admission Unit - ICU", "Admission Unit - Other", "Hypertension", "Age", "BMI")
 colnames(regression_table) <- c("Variable", "Estimate", "Standard Error", "Statistic", "Degrees of Freedom", "p-value")
 regression_table$`p-value` <- ifelse(regression_table$`p-value` < 0.001,
                                      "< 0.001", 
@@ -207,7 +207,7 @@ fp_data2 <- regression_table[-1,]
 fp_data2$labeltext <- c("Admission NIHSS", "Admission MRS", "Side of Stroke - Right", 
                        "Side of Stroke - Bilateral", "Admission Unit - Observation", 
                        "Admission Unit - Stroke", "Admission Unit - ICU", "Admission Unit - Other", 
-                       "Hypertension", "Age", "BMI", "Cholesterol")
+                       "Hypertension", "Age", "BMI")
 fp_data2$display_est <- round(fp_data2$Estimate,3)
 fp_data2$lower<- round(fp_data2$Estimate - 1.96 * fp_data2$`Standard Error`,3)
 fp_data2$upper<- round(fp_data2$Estimate + 1.96 * fp_data2$`Standard Error`,3)
