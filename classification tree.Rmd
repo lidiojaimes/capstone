@@ -132,7 +132,7 @@ plot(cv.mdl2tree1$dev~cv.mdl2tree1$size,type="b",lwd=2,pch=19,col="darkorchid",
      xlab="# of leaves",ylab="Total deviance (SSE) across all folds")
 cv.mdl2tree1$size[which.min(cv.mdl2tree1$dev)]
 
-prune.mdl2tree1 <- prune.tree(mdl2_tree1,best=5)
+prune.mdl2tree1 <- prune.tree(mdl2_tree1,best=4)
 plot(prune.mdl2tree1,col="firebrick");text(prune.mdl2tree1,col="royalblue3",cex=.5)
 
 mdl2.test$predprune <- 
