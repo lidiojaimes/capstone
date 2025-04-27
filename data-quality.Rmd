@@ -60,7 +60,7 @@ stroke_covid <-
       covid_19 == "Yes (Once)" ~ "Yes",
       covid_19 == "positive" ~ "Yes",
       covid_19 == "negative" ~ "No")) |> 
-  select(id_number,covid_19,stroke_when_lockdown,date_of_stroke,covid_19_notes)
+  select(id_number, covid_19, stroke_when_lockdown, date_of_stroke, covid_19_notes)
 
 stroke_covid |> 
   filter(covid_19=="Yes" & stroke_when_lockdown == "before covid")
@@ -71,9 +71,10 @@ Assuming the date in covid_19_notes refers to date of when they tested positive 
 ```{r}
 stroke_covid |> 
   filter(grepl("^\\d+$", covid_19_notes)) |> 
-  mutate(covid_19 = ifelse(stroke_when_lockdown=="before covid","No",covid_19), # corrected error from above
+  mutate(covid_19 = ifelse(stroke_when_lockdown == "before covid",
+                           "No", covid_19), # corrected error from above
          covid_19_notes = openxlsx::convertToDate(covid_19_notes)) |> 
-  filter(covid_19=="Yes" & covid_19_notes>date_of_stroke)
+  filter(covid_19 == "Yes" & covid_19_notes>date_of_stroke)
 ```
 
 
