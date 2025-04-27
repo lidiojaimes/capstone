@@ -143,7 +143,10 @@ stroke <-
            TRUE ~ NA),
          admission_unit = factor(admission_unit,
                                  levels = c("ICU", "Stroke Unit", "Observation Unit",
-                                            "Admission transfer from ED", "Other")))
+                                            "Admission transfer from ED", "Other")),
+         by_mix = paste(year_of_birth, age, sex, date_of_stroke, discharge_date,
+                        expiration_date, sep = ",")) |>
+  distinct(by_mix, .keep_all = TRUE)
 
 stroke[stroke$id_number==532,"race"] = "Other"
 stroke[stroke$id_number==223,"race"] = "Other"
