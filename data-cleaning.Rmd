@@ -100,13 +100,13 @@ stroke <-
          htn = as.numeric(htn),
          antidepressant_use = as.numeric(antidepressant_use),
          anxiolytic_use = as.numeric(anxiolytic_use),
-         date_cov19 = ifelse(date_of_stroke>="2020-03-15","after covid","before covid"),
-         covid_19 = ifelse(date_cov19=="before covid","No",covid_19),
-         covid_19 = case_when(
-           covid_19 == "No" ~ "No",
-           covid_19 == "Yes (Once)" ~ "Yes",
-           covid_19 == "positive" ~ "Yes",
-           covid_19 == "negative" ~ "No"),
+         # date_cov19 = ifelse(date_of_stroke>="2020-03-15","after covid","before covid"),
+         # covid_19 = ifelse(date_cov19=="before covid","No",covid_19),
+         # covid_19 = case_when(
+         #   covid_19 == "No" ~ "No",
+         #   covid_19 == "Yes (Once)" ~ "Yes",
+         #   covid_19 == "positive" ~ "Yes",
+         #   covid_19 == "negative" ~ "No"),
          antidep_arrival = ifelse(antidepressant_use == 1, 1, 0),
          anxio_arrival = ifelse(anxiolytic_use == 1, 1, 0),
          statin_arrival = 
@@ -155,6 +155,3 @@ Patients with Race classified as other are either: Other(Native American and Nat
 Notes for paper: weird entry for presence of caregiver for 18, set as unknown.
 
 **medication** use (anticoagulants, statins, antidepressants, anxiolytics): Medication data at arrival only available from patients 375 and onward (some still missing after). 
-
-
-
