@@ -1,0 +1,79 @@
+---
+title: "Data Quality"
+author: "Lidio Jaimes Jr"
+date: "2025-04-27"
+output: pdf_document
+---
+# Repeat Patients
+
+When running the analyses, we realized that some patients had their data entered twice. We noticed this by creating a variable (**by_mix**) that combines a patients year of birth, age, sex, date of stroke, discharge date, and expiration date. The chances of two different patients having the exact same information for these characteristics are pretty small. The patients that have matching **by_mix** are then looked at exclusively along with the cholesterol and BMI variable. Most of these pairings have similar cholesterol levels and BMI, which causes us to believe they're likely duplicate entries. These are the pairings based on patient id_number: 167 & 379, 251 & 403, 104 & 504, 125 & 581, 206 & 402, 44 & 390, 315 & 452, 3 & 577, 49 & 511, 4 & 392, 160 & 381, 57 & 514, 20 & 393, 259 & 435, 158 & 461, 30 & 505, 247 & 557, 318 & 447, 360 & 406, and 154 & 455. Two pairings have meaningful difference in cholesterol levels or BMI: 104 & 504 (cholesterol) and 318 & 447 (cholesterol and slight BMI). So these could potentially be different patients, but not likely. All of the analyses below **do not** have these duplicates excluded. So the duplicates will appear if they fit any criteria of inconsistencies below. 
+
+```{r}
+repeat_bymix <- 
+  stroke |> 
+  mutate(
+    by_mix = paste(year_of_birth, age, sex, date_of_stroke, discharge_date,
+                   expiration_date, sep = ",")) |> 
+  group_by(by_mix) |> 
+  summarise(count=n()) |> 
+  filter(count>1)
+
+stroke |> 
+  mutate(
+    by_mix = paste(year_of_birth, age, sex, date_of_stroke, discharge_date,
+                   expiration_date, sep = ",")) |> 
+  filter(by_mix%in%repeat_bymix$by_mix) |> 
+  select(id_number, by_mix, cholesterol_mg_d_l, bmi_kg_m_2) |> 
+  arrange(factor(by_mix))
+```
+
+# Discharge Destinations
+
+These patients have multiple discharge destinations: 18, 20, 28, 47, 66, 75, 80, 101, 119, 133, 138, 153, 156, 174, 188, 229, 256, 352, 393, 405, 410, 412, 427, 463, 476, 478, 485, 486, 508, 509, 513, 515, 523, 533, 535, 539, 541, 569, and 580. The most common pairings contain hospice.  
+
+```{r}
+stroke[, c(172,174:177,179:182)] <- lapply(stroke[, c(172,174:177,179:182)], as.numeric)
+
+stroke |> 
+  select(id_number,expiration,acute_rehabilitation,subacute_rehabilitation,
+         inpatient_rehabilitation,assited_living_facility,home_health,
+         home_with_no_needs,hospice,other_discharge_location) |> 
+  rowwise() |> 
+  mutate(row_sum = sum(c_across(-1), na.rm = TRUE)) |> 
+  ungroup() |> 
+  filter(row_sum==2) |> 
+  select(id_number, expiration, subacute_rehabilitation, home_health, 
+         home_with_no_needs, hospice, other_discharge_location)
+```
+
+# COVID 19
+
+These patients had their stroke before 2020-03-15 but their covid_19 variable has a response of yes: 4, 48, 103, 139, 143, and 168
+```{r}
+stroke_covid <- 
+  stroke |>
+  mutate(
+    stroke_when_lockdown = # date of stroke in relation to start of lockdown 2020-03-15
+      ifelse(date_of_stroke>="2020-03-15","after covid","before covid"),
+    covid_19 = case_when(
+      covid_19 == "No" ~ "No",
+      covid_19 == "Yes (Once)" ~ "Yes",
+      covid_19 == "positive" ~ "Yes",
+      covid_19 == "negative" ~ "No")) |> 
+  select(id_number,covid_19,stroke_when_lockdown,date_of_stroke,covid_19_notes)
+
+stroke_covid |> 
+  filter(covid_19=="Yes" & stroke_when_lockdown == "before covid")
+```
+
+Assuming the date in covid_19_notes refers to date of when they tested positive for COVID-19. These patients tested positive after their stroke, but for some reason still have the covid_19 variable as Yes (even though they didn't have it when admitted for stroke). 
+
+```{r}
+stroke_covid |> 
+  filter(grepl("^\\d+$", covid_19_notes)) |> 
+  mutate(covid_19 = ifelse(stroke_when_lockdown=="before covid","No",covid_19), # corrected error from above
+         covid_19_notes = openxlsx::convertToDate(covid_19_notes)) |> 
+  filter(covid_19=="Yes" & covid_19_notes>date_of_stroke)
+```
+
+
