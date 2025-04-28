@@ -148,7 +148,19 @@ One of the variables of interest is race, due to its relationship with stroke pr
 
 One of the response variables of interest for the statistical analysis is length of admission days, which quantifies how many days were spent at the hospital. Patients 316 and 322 had 105 and 79 days respectively; they were excluded from analyses because they were likely admitted for so long due to different factors. Patient 361 has a decimal for length of admission days, and it is now rounded up to 16 days.
 
-Keeping a consistent data dictionary would help. There were multiple spellings for things indicating the same thing, such as White for Race and Yes or No for COVID-19.
+## Suggestions 
+
+1. Keeping a consistent data dictionary would help. 
+
+ - There were multiple spellings for things indicating the same thing. For example, White/Caucasian for Race and "Yes" or "Yes (Once)" for COVID-19. Making this a variable with numerical values could help with misspellings. For example, the Race variable: 1=White, 2=Black, 3=Other
+ 
+ - There were multiple spellings for NA values or sometimes just blank. When initially reading in the data the arguments for what to consider NAs are: "", " ", "UNK", "Unk", "NA", "na", "Na", 9999, and "????". Using a single value like NA could help. If the column is still in progress maybe "IP" instead of marking it as NA. 
+ 
+2. For variables where a patient shouldn't have multiple categories, like discharge destinations, making one categorical variable with all the levels coded for a distinct number would help avoiding these double entries. 
+
+3. Discharge scores have about 50% missing. NIHSS and MRS scores are telling of the length of hospital stay. Patients with recorded NIHSS and MRS values both at admission and discharge are best to have. 
+ 
+4. If possible expand the data to include follow up outcomes three to six months perhaps post stroke to research recovery. 
 
 \pagebreak
 # Repeat Patients
