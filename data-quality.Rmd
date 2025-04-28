@@ -195,7 +195,8 @@ stroke |>
   filter(by_mix%in%repeat_bymix2$by_mix,
          !id_number%in%repeat_patient_pairings$id_number) |> 
   select(id_number, by_mix, cholesterol_mg_d_l, bmi_kg_m_2) |> 
-  arrange(factor(by_mix))
+  arrange(factor(by_mix)) |> 
+  kableExtra::kable()
 ```
 
 \pagebreak
