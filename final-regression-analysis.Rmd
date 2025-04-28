@@ -98,9 +98,15 @@ Only age, bmi, cholesterol, and log length hospital stay can be argued for being
 ```{r Multicollinearity}
 mdl1_data |> 
   select_if(is.numeric) |> 
+  rename(`Admission\nNIHSS` = admission_nihss,
+         `Admission\nMRS` = admission_mrs_score,
+         Age = age,
+         BMI = bmi_kg_m_2,
+         Cholesterol = cholesterol_mg_d_l,
+         `Length of\nAdmission\nDays` = length_of_admission_days) |> 
   na.omit() |> # 271 patients
   cor() |> 
-  corrplot::corrplot.mixed()
+  corrplot::corrplot.mixed(tl.cex=.75) 
 ```
 
 No alarming multicollinearity
