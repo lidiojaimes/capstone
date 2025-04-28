@@ -106,7 +106,7 @@ mdl1_data |>
 No alarming multicollinearity
 
 # Initial Model
-$$\log[\text{Length of admission days}_i] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{Cortical Lesion}_i + \beta_6\text{AdmissionUnit-Observation}_i + \beta_7\text{AdmissionUnit-Stroke}_i +\beta_8\text{AdmissionUnit-ICU}_i + \\ \beta_9\text{AdmissionUnit-Other}_i +  \beta_{10}\text{Prior Stroke}_i + \beta_{11}\text{Diabetes} + \beta_{12}\text{Hypertension} + \beta_{13}\text{IschemicHeartDisease} + \\ \beta_{14}\text{Antidepressants}_i + \beta_{15}\text{Anxiolytics}_i + \beta_{16}\text{SmokingHistory-Former} + \beta_{17}\text{SmokingHistory-Current} + \\ \beta_{18}\text{CaregiverPresence}_i +  \beta_{19}\text{Race-Black}_i + \beta_{20}\text{Race-Other}_i + \beta_{21}\text{Age}_i + \beta_{22}\text{Sex-Male}_i + \beta_{23}\text{BMI}_i + \beta_{24}\text{Cholesterol}_i + \epsilon_i$$
+$$\log[\text{Length of admission days}_i] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{Cortical Lesion}_i + \beta_6\text{AdmissionUnit-Observation}_i + \beta_7\text{AdmissionUnit-Stroke}_i +\beta_8\text{AdmissionUnit-ICU}_i + \\ \beta_9\text{AdmissionUnit-Other}_i +  \beta_{10}\text{Prior Stroke}_i + \beta_{11}\text{Diabetes}_i + \beta_{12}\text{Hypertension}_i + \beta_{13}\text{IschemicHeartDisease}_i + \\ \beta_{14}\text{Antidepressants}_i + \beta_{15}\text{Anxiolytics}_i + \beta_{16}\text{SmokingHistory-Former}_i + \beta_{17}\text{SmokingHistory-Current}_i + \\ \beta_{18}\text{CaregiverPresence}_i +  \beta_{19}\text{Race-Black}_i + \beta_{20}\text{Race-Other}_i + \beta_{21}\text{Age}_i + \beta_{22}\text{Sex-Male}_i + \beta_{23}\text{BMI}_i + \beta_{24}\text{Cholesterol}_i + \epsilon_i$$
 
 ## Running MICE and Regression
 ```{r MICE}
@@ -180,7 +180,7 @@ fit_final <- with(imp2, #run final stepwise mdl to all 100 datasets
                        admission_unit + htn + age + bmi_kg_m_2))
 ```
 
-$$\log[\text{Length of admission days}_i] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{AdmissionUnit-Observation}_i + \beta_6\text{AdmissionUnit-Stroke}_i +\beta_7\text{AdmissionUnit-ICU}_i +  \beta_8\text{AdmissionUnit-Other}_i + \\\beta_{9}\text{Hypertension} + \beta_{10}\text{Age}_i + \beta_{11}\text{BMI}_i + \epsilon_i$$
+$$\log[\text{Length of admission days}_i] = \beta_0 + \beta_1\text{AdmissionNIHSS}_i + \beta_2\text{AdmissionMRS}_i + \beta_3\text{Side of Stroke-Right}_i + \beta_4\text{Side of Stroke-Bilateral}_i +  \\ \beta_5\text{AdmissionUnit-Observation}_i + \beta_6\text{AdmissionUnit-Stroke}_i +\beta_7\text{AdmissionUnit-ICU}_i +  \beta_8\text{AdmissionUnit-Other}_i + \\\beta_{9}\text{Hypertension}_i + \beta_{10}\text{Age}_i + \beta_{11}\text{BMI}_i + \epsilon_i$$
 
 ```{r Stepwise Results}
 res_final <- pool(fit_final)
