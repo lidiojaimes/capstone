@@ -165,14 +165,37 @@ repeat_bymix <-
   summarise(count=n()) |> 
   filter(count>1)
 
-stroke |> 
+repeat_patient_pairings <- 
+  stroke |> 
   mutate(
     by_mix = paste(year_of_birth, age, sex, date_of_stroke, discharge_date,
                    expiration_date, sep = ",")) |> 
   filter(by_mix%in%repeat_bymix$by_mix) |> 
   select(id_number, by_mix, cholesterol_mg_d_l, bmi_kg_m_2) |> 
-  arrange(factor(by_mix)) |> 
-  kableExtra::kable()
+  arrange(factor(by_mix))
+
+repeat_patient_pairings |> kableExtra::kable()
+```
+
+I just messed around with some other variables and made it less specific (included race and only date of stroke). These are other potential identical pairings: 98 & 579, 163 & 459, 327 & 533, and 156 & 463
+
+```{r}
+repeat_bymix2 <- 
+  stroke |> 
+  mutate(
+    by_mix = paste(year_of_birth, age, sex, race, date_of_stroke, sep = ",")) |> 
+  group_by(by_mix) |> 
+  summarise(count=n()) |> 
+  filter(count>1)
+
+
+stroke |> 
+  mutate(
+    by_mix = paste(year_of_birth, age, sex, race, date_of_stroke, sep = ",")) |> 
+  filter(by_mix%in%repeat_bymix2$by_mix,
+         !id_number%in%repeat_patient_pairings$id_number) |> 
+  select(id_number, by_mix, cholesterol_mg_d_l, bmi_kg_m_2) |> 
+  arrange(factor(by_mix))
 ```
 
 \pagebreak
