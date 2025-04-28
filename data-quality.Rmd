@@ -4,6 +4,153 @@ author: "Lidio Jaimes Jr"
 date: "2025-04-27"
 output: pdf_document
 ---
+```{r for KNIT, include=FALSE}
+library(tidyverse)
+library(forcats)
+stroke_raw <- 
+  readxl::read_xlsx("Capstone Combined Data Collection Sheets - Summer 2024.xlsx", 
+                    skip = 1,
+                    na=c("", " ", "UNK", "Unk", "NA", "na", "Na", 9999, "????")) |> 
+  janitor::clean_names()
+stroke <- stroke_raw[-c(1,376), ] #get rid of dictionary and black row
+
+# E336 (patient 333) and E340 (patient 337) have full date instead of just year
+stroke[stroke$id_number == 333, "year_of_birth"] = 1905 #set as 1981 instead of 1905
+stroke[stroke$id_number == 337, "year_of_birth"] = 1942
+stroke$date_identified = openxlsx::convertToDate(stroke$date_identified)
+stroke$discharge_date = openxlsx::convertToDate(stroke$discharge_date)
+stroke$date_of_stroke = openxlsx::convertToDate(stroke$date_of_stroke)
+stroke$expiration_date_in_hospital = openxlsx::convertToDate(stroke$expiration_date_in_hospital)
+stroke$expiration_date = openxlsx::convertToDate(stroke$expiration_date)
+stroke$length_of_admission_days = round(as.numeric(stroke$length_of_admission_days),0)
+
+stroke <- 
+  stroke |> 
+  filter(!id_number%in%c(211, 391, 528, 529, 536, 537, 555, 558, 576, 582),
+         !id_number%in%c(316,322),
+         ischemic == 1)
+
+stroke$brainstem_stroke_lcation <- as.numeric(stroke$brainstem_stroke_lcation)
+
+stroke <-
+  stroke |>
+  mutate(multiple_locations = 
+           ifelse(rowSums(stroke[,106:110], na.rm = TRUE) > 1, 
+                  1, 0), #multiple stroke locations indicator
+         location_of_stroke = 
+           case_when(
+             multiple_locations==0 & brainstem_stroke_lcation == 1 ~ "brainstem",
+             multiple_locations==0 & cerebellum_stroke_location == 1 ~ "cerebellum",
+             multiple_locations==0 & cortical_stroke_location == 1 ~ "cortical",
+             multiple_locations==0 & subcortical_stroke_location == 1 ~ "subcortical",
+             multiple_locations==1 ~ "multiple locations"),
+         location_of_stroke = factor(location_of_stroke,
+                                     levels = c("brainstem","cerebellum",
+                                                "cortical","subcortical",
+                                                "multiple locations"),
+                                     labels = c("Brainstem","Cerebellum",
+                                                "Cortical","Subcortical",
+                                                "Multiple Locations")),
+         lesion_cortical=ifelse(cortical_stroke_location==1,1,0), #cortical location indicator
+         race = ifelse(race=="Other","Other","White"),
+         race = case_when(
+           race == "White" ~ "White",
+           str_detect(patient_identification_notes, "African") ~ "Black",
+           TRUE ~ "Other"),
+         race = factor(race, levels = c("White", "Black", "Other")),
+         age = ifelse(is.na(age),estimated_age,age),
+         age = as.numeric(age),
+         admission_nihss = as.numeric(admission_nihss),
+         admission_mrs_score = as.numeric(admission_mrs_score),
+         cholesterol_mg_d_l = as.numeric(cholesterol_mg_d_l),
+         prior_stroke = case_when(
+           prior_stroke == 0 ~ "No",
+           prior_stroke == 1 ~ "Yes"),
+         prior_tia = case_when(
+           prior_tia == 0 ~ "No",
+           prior_tia == 1 ~ "Yes"),
+         cholesterol_group = case_when(
+           cholesterol_mg_d_l < 200 ~ "Normal",
+           cholesterol_mg_d_l >= 200 & cholesterol_mg_d_l <=239 ~ "Borderline high",
+           cholesterol_mg_d_l >= 240 ~ "High"),
+         cholesterol_group = factor(cholesterol_group,
+                                    levels = c("Normal","Borderline high","High")),
+         cigarette_smoking = case_when(
+           cigarette_smoking == "Former" | cigarette_smoking == "former" ~ "Former",
+           cigarette_smoking == "Never" | cigarette_smoking == "NEver" ~ "Never",
+           cigarette_smoking == "Current" | cigarette_smoking == "Current\r\n\rCurrent" ~ "Current"),
+         cigarette_smoking = factor(cigarette_smoking,
+                                    levels = c("Never","Former","Current")),
+         #ischemic_heart_disease = ifelse(ischemic_heart_disease == 0, "No", "Yes"),
+         ischemic_heart_disease = as.numeric(ischemic_heart_disease),
+         htn = as.numeric(htn),
+         antidepressant_use = as.numeric(antidepressant_use),
+         anxiolytic_use = as.numeric(anxiolytic_use),
+         # date_cov19 = ifelse(date_of_stroke>="2020-03-15","after covid","before covid"),
+         # covid_19 = ifelse(date_cov19=="before covid","No",covid_19),
+         # covid_19 = case_when(
+         #   covid_19 == "No" ~ "No",
+         #   covid_19 == "Yes (Once)" ~ "Yes",
+         #   covid_19 == "positive" ~ "Yes",
+         #   covid_19 == "negative" ~ "No"),
+         antidep_arrival = ifelse(antidepressant_use == 1, 1, 0),
+         anxio_arrival = ifelse(anxiolytic_use == 1, 1, 0),
+         statin_arrival = 
+           ifelse(str_detect(medication_list_at_arrival, "Statin"), 1, 0),
+         # anticoag_arrival =
+         #   ifelse(str_detect(medication_list_at_arrival, "Anticoagulants"), 1, 0),
+         dm = factor(dm,levels=c(0,1),labels=c("No","Yes")),
+         depression = factor(depression,levels=c(0,1),labels=c("No","Yes")),
+         length_of_admission_days = as.numeric(length_of_admission_days),
+         caregiver = case_when(
+           presence_of_caregiver == "0" ~ "Absent",
+           presence_of_caregiver == "1" ~ "Present",
+           TRUE ~ "Unknown"),
+         caregiver = factor(caregiver),
+         pt_am_pac_score = as.numeric(pt_am_pac_score),
+         discharge_nihss = as.numeric(discharge_nihss),
+         discharge_mrs_score = as.numeric(discharge_mrs_score),
+         ot_am_pac_score = as.numeric(ot_am_pac_score),
+         log_lengthhospitalstay = log(length_of_admission_days),
+         side_of_stroke = case_when(
+           side_of_stroke == 1 ~ "Right",
+           side_of_stroke == 2 ~ "Left",
+           side_of_stroke == 3 ~ "Bilateral",
+           TRUE ~ NA),
+         side_of_stroke = 
+           factor(side_of_stroke,
+                  levels = c("Right","Left","Bilateral")),
+         admission_unit = case_when( #there are ppl with two admission units
+           admission_unit == "1" ~ "ICU",
+           admission_unit == "2" ~ "Stroke Unit",
+           admission_unit == "3" ~ "Observation Unit",
+           admission_unit == "4" ~ "Admission transfer from ED",
+           admission_unit == "5" ~ "Other",
+           TRUE ~ NA),
+         admission_unit = factor(admission_unit,
+                                 levels = c("ICU", "Stroke Unit", "Observation Unit",
+                                            "Admission transfer from ED", "Other")))
+
+stroke[stroke$id_number==532,"race"] = "Other"
+stroke[stroke$id_number==223,"race"] = "Other"
+stroke[, c(172,174:177,179:182)] <- lapply(stroke[, c(172,174:177,179:182)], as.numeric)
+```
+
+# Initial data cleaning
+
+Patients 316 (105 days) and 322 (79 days) were removed from analyses. Their length of admission days being so large is likely due to different factors. Patients 211, 528, 529, 536, 537, 555, 558, 576, 582 were all/majority blank and removed from analyses. Patient 391 had repeat MRN and one observation was removed from analyses. Focus on ischemic, so everyone with different type of stroke was removed. Patient 361 has a decimal for length of admission days, was rounded up to 16. Patients with Race classified as other are either: Other(Native American and Native Hawaiian), refused to answer question, or are mixed (patient 532 and 223). Weird entry for presence of caregiver for 18 (has 0 and 1), set as unknown.
+
+*More on race:*
+
+One of the variables of interest is race, due to its relationship with stroke prevalence. Within the responses to this variable, there are multiple spellings for White/Caucasian, and the remaining category is labeled as other. To identify the race of individuals grouped into Other, the variable titled patient identification notes was used. If the entry contained the word African, the patient was labeled as Black. There were no Asians in the cohort, and the few patients identified as mixed race were left categorized as other. The other category includes patients who refused to identify themselves, whose data were unavailable, who are mixed-race, or whose race is categorized as other, such as Native Hawaiian. One patient (223) was listed as White, but their patient identification notes also indicated Native Hawaiian, they were grouped with the other patients.
+
+*More on length of admission days:*
+
+One of the response variables of interest for the statistical analysis is length of admission days, which quantifies how many days were spent at the hospital. Patients 316 and 322 had 105 and 79 days respectively; they were excluded from analyses because they were likely admitted for so long due to different factors. Patient 361 has a decimal for length of admission days, and it is now rounded up to 16 days.
+
+Keeping a consistent data dictionary would help. There were multiple spellings for things indicating the same thing, such as White for Race and Yes or No for COVID-19.
+
+\pagebreak
 # Repeat Patients
 
 When running the analyses, we realized that some patients had their data entered twice. We noticed this by creating a variable (**by_mix**) that combines a patients year of birth, age, sex, date of stroke, discharge date, and expiration date. The chances of two different patients having the exact same information for these characteristics are pretty small. The patients that have matching **by_mix** are then looked at exclusively along with the cholesterol and BMI variable. Most of these pairings have similar cholesterol levels and BMI, which causes us to believe they're likely duplicate entries. These are the pairings based on patient id_number: 167 & 379, 251 & 403, 104 & 504, 125 & 581, 206 & 402, 44 & 390, 315 & 452, 3 & 577, 49 & 511, 4 & 392, 160 & 381, 57 & 514, 20 & 393, 259 & 435, 158 & 461, 30 & 505, 247 & 557, 318 & 447, 360 & 406, and 154 & 455. Two pairings have meaningful difference in cholesterol levels or BMI: 104 & 504 (cholesterol) and 318 & 447 (cholesterol and slight BMI). So these could potentially be different patients, but not likely. All of the analyses below **do not** have these duplicates excluded. So the duplicates will appear if they fit any criteria of inconsistencies below. 
@@ -24,8 +171,11 @@ stroke |>
                    expiration_date, sep = ",")) |> 
   filter(by_mix%in%repeat_bymix$by_mix) |> 
   select(id_number, by_mix, cholesterol_mg_d_l, bmi_kg_m_2) |> 
-  arrange(factor(by_mix))
+  arrange(factor(by_mix)) |> 
+  kableExtra::kable()
 ```
+
+\pagebreak
 
 # Discharge Destinations
 
@@ -43,8 +193,14 @@ stroke |>
   ungroup() |> 
   filter(row_sum==2) |> 
   select(id_number, expiration, subacute_rehabilitation, home_health, 
-         home_with_no_needs, hospice, other_discharge_location)
+         home_with_no_needs, hospice, other_discharge_location) |> 
+  rename(subacute_rehab = subacute_rehabilitation,
+         home_no_needs = home_with_no_needs,
+         other_disc = other_discharge_location) |> 
+  kableExtra::kable()
 ```
+
+\pagebreak
 
 # COVID 19
 
@@ -63,7 +219,8 @@ stroke_covid <-
   select(id_number, covid_19, stroke_when_lockdown, date_of_stroke, covid_19_notes)
 
 stroke_covid |> 
-  filter(covid_19=="Yes" & stroke_when_lockdown == "before covid")
+  filter(covid_19=="Yes" & stroke_when_lockdown == "before covid") |> 
+  kableExtra::kable()
 ```
 
 Assuming the date in covid_19_notes refers to date of when they tested positive for COVID-19. These patients tested positive after their stroke, but for some reason still have the covid_19 variable as Yes (even though they didn't have it when admitted for stroke). 
@@ -74,7 +231,6 @@ stroke_covid |>
   mutate(covid_19 = ifelse(stroke_when_lockdown == "before covid",
                            "No", covid_19), # corrected error from above
          covid_19_notes = openxlsx::convertToDate(covid_19_notes)) |> 
-  filter(covid_19 == "Yes" & covid_19_notes>date_of_stroke)
+  filter(covid_19 == "Yes" & covid_19_notes>date_of_stroke) |> 
+  kableExtra::kable()
 ```
-
-
